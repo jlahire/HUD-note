@@ -98,8 +98,8 @@ pip3 install pynput markdown2
 
 **2. Clone and Setup**
 ```bash
-git clone https://github.com/yourusername/hud-notes.git
-cd hud-notes
+git clone https://github.com/jlahire/HUD-note.git
+cd HUD-note
 ./setup.sh
 ./install_hud_notes.sh
 ```
