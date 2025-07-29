@@ -28,8 +28,8 @@ Vibe code project.
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/yourusername/hud-notes.git
-   cd hud-notes
+   git clone https://github.com/jlahire/HUD-note.git
+   cd HUD-note
    ```
 
 2. **Run the setup script:**
