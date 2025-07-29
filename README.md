@@ -64,7 +64,7 @@ echo '#!/bin/bash
 exec python3 "$HOME/tools/hud-notes" "$@"' > ~/bin/hud-notes
 chmod +x ~/bin/hud-notes
 
-# Add to PATH and create alias
+# Add to PATH and create alias(if not already done during setup)
 echo 'export PATH="$HOME/bin:$PATH"' >> ~/.bashrc
 echo 'alias HUD="hud-notes"' >> ~/.bashrc
 source ~/.bashrc
