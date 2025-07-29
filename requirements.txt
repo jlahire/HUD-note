@@ -1,0 +1,20 @@
+# HUD Notes Requirements
+# Core dependencies for the HUD Notes application
+
+# Global hotkey support
+pynput>=1.7.6
+
+# Markdown processing for preview and export
+markdown2>=2.4.0
+
+# GUI framework (usually bundled with Python)
+# tkinter - included with most Python installations
+
+# Optional: Enhanced markdown support
+# Pillow>=8.0.0  # For image handling in markdown (optional)
+# requests>=2.25.0  # For URL handling (optional)
+
+# Development dependencies (uncomment for development)
+# pytest>=6.0.0  # For testing
+# black>=21.0.0  # Code formatting
+# flake8>=3.8.0  # Linting
