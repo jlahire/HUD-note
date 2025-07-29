@@ -38,10 +38,8 @@ Vibe code project.
    ./setup.sh
    ```
 
-3. **Follow the installer prompts:**
-   ```bash
-   ./install_hud_notes.sh
-   ```
+3. **Alias**
+   Pick your alias during installation
 
 4. **Start using HUD Notes:**
    ```bash
