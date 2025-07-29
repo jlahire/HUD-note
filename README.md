@@ -1,6 +1,7 @@
 # HUD Notes
 
 A lightweight, HUD-style overlay note-taking application with multi-display support, syntax highlighting, and customizable templates.
+Vibe code project.
 
 ![HUD Notes Demo](screenshots/hud_notes_demo.gif)
 
