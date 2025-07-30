@@ -154,6 +154,16 @@ class NoteOverlay:
         # Load configuration
         self.load_config()
         
+        # Initialize advanced features
+        self.hover_monitor_active = False
+        
+        # Setup advanced features if enabled
+        if self.config.get('mouse_hover_show', False):
+            self.setup_mouse_hover_monitor()
+        
+        if self.config.get('click_outside_hide', False):
+            self.setup_click_outside_monitor()
+        
         # Create screen border (always visible)
         self.create_screen_border()
         
@@ -166,8 +176,8 @@ class NoteOverlay:
         # Setup global hotkey
         self.setup_hotkey()
         
-        # Load last opened file or create new with title
-        self.load_last_file_or_create_new()
+        # Display all available templates at startup
+        self.display_all_templates_at_startup()
 
     def show_startup_config(self):
         """Show startup configuration dialog with proper sizing"""
@@ -261,23 +271,6 @@ class NoteOverlay:
                 bg='#333333', fg='#ffffff', font=('Consolas', 10),
                 insertbackground='#00ff41', relief=tk.FLAT).pack(fill=tk.X, pady=5)
         
-        # Template selection (will be loaded dynamically)
-        template_frame = tk.Frame(main_frame, bg='#1a1a1a')
-        template_frame.pack(fill=tk.X, pady=10)
-        
-        tk.Label(template_frame, text="📋 Note Template:", 
-                bg='#1a1a1a', fg='#00ff41', font=('Consolas', 12, 'bold')).pack(anchor=tk.W)
-        
-        # Create templates directory to load available templates
-        temp_templates_dir = os.path.join(dir_var.get(), "templates")
-        temp_template_manager = TemplateManager(temp_templates_dir)
-        
-        template_var = tk.StringVar(value="Basic")
-        template_dropdown = ttk.Combobox(template_frame, textvariable=template_var, 
-                                       values=temp_template_manager.get_template_names(), 
-                                       state='readonly', width=30, font=('Consolas', 10))
-        template_dropdown.pack(anchor=tk.W, pady=5)
-        
         # Buttons frame
         button_frame = tk.Frame(main_frame, bg='#1a1a1a')
         button_frame.pack(fill=tk.X, pady=(30, 0))
@@ -287,11 +280,6 @@ class NoteOverlay:
             self.templates_dir = os.path.join(self.notes_dir, "templates")
             self.author_name = author_var.get()
             self.note_title = title_var.get()
-            
-            # Get template content
-            template_name = template_var.get()
-            temp_manager = TemplateManager(self.templates_dir)
-            self.note_template = temp_manager.get_template_content(template_name)
             
             self.setup_complete = True
             config_root.destroy()
@@ -340,6 +328,267 @@ class NoteOverlay:
         config_root.mainloop()
         
         return self.setup_complete
+
+    def show_template_selection(self):
+        """Show template selection dialog when starting HUD Notes"""
+        template_window = tk.Toplevel(self.root)
+        template_window.title("Select Template")
+        template_window.geometry("500x400")
+        template_window.configure(bg='#1a1a1a')
+        template_window.attributes('-topmost', True)
+        template_window.resizable(True, True)
+        
+        # Center the window
+        current_display = self.displays[self.current_display]
+        x = current_display['x'] + (current_display['width'] - 500) // 2
+        y = current_display['y'] + (current_display['height'] - 400) // 2
+        template_window.geometry(f"500x400+{x}+{y}")
+        
+        # Ensure it shows properly
+        template_window.deiconify()
+        template_window.lift()
+        template_window.focus_force()
+        
+        # Main frame
+        main_frame = tk.Frame(template_window, bg='#1a1a1a')
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+        
+        # Title
+        title_label = tk.Label(main_frame, text="📋 Choose Note Template", 
+                              bg='#1a1a1a', fg='#00ff41',
+                              font=('Consolas', 16, 'bold'))
+        title_label.pack(pady=(0, 20))
+        
+        # Template list frame
+        list_frame = tk.Frame(main_frame, bg='#1a1a1a')
+        list_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 20))
+        
+        # Listbox with templates
+        listbox_frame = tk.Frame(list_frame, bg='#333333', relief=tk.SOLID, bd=1)
+        listbox_frame.pack(fill=tk.BOTH, expand=True)
+        
+        scrollbar = tk.Scrollbar(listbox_frame)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        template_listbox = tk.Listbox(
+            listbox_frame,
+            bg='#333333',
+            fg='#ffffff',
+            selectbackground='#0066cc',
+            selectforeground='#ffffff',
+            font=('Consolas', 11),
+            relief=tk.FLAT,
+            borderwidth=0,
+            yscrollcommand=scrollbar.set,
+            height=15
+        )
+        template_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.config(command=template_listbox.yview)
+        
+        # Populate listbox with templates
+        template_names = self.template_manager.get_template_names()
+        for i, template_name in enumerate(sorted(template_names)):
+            template_listbox.insert(tk.END, f"📝 {template_name}")
+            if template_name == "Basic":
+                template_listbox.selection_set(i)
+        
+        # Preview frame
+        preview_frame = tk.Frame(main_frame, bg='#1a1a1a')
+        preview_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 20))
+        
+        tk.Label(preview_frame, text="Preview:", 
+                bg='#1a1a1a', fg='#00ff41', font=('Consolas', 12, 'bold')).pack(anchor=tk.W)
+        
+        preview_text = ScrolledText(
+            preview_frame,
+            wrap=tk.WORD,
+            bg='#2a2a2a',
+            fg='#cccccc',
+            font=('Consolas', 9),
+            relief=tk.FLAT,
+            borderwidth=1,
+            height=8,
+            state=tk.DISABLED
+        )
+        preview_text.pack(fill=tk.BOTH, expand=True, pady=5)
+        
+        def update_preview(event=None):
+            """Update preview when selection changes"""
+            selection = template_listbox.curselection()
+            if selection:
+                template_name = template_names[selection[0]]
+                template_content = self.template_manager.get_template_content(template_name)
+                
+                # Format template with current values
+                formatted_content = template_content.format(
+                    title=self.note_title,
+                    author=self.author_name,
+                    date=datetime.now().strftime('%Y-%m-%d %H:%M')
+                )
+                
+                preview_text.config(state=tk.NORMAL)
+                preview_text.delete(1.0, tk.END)
+                preview_text.insert(1.0, formatted_content)
+                preview_text.config(state=tk.DISABLED)
+        
+        template_listbox.bind('<<ListboxSelect>>', update_preview)
+        
+        # Initial preview
+        if template_listbox.curselection():
+            update_preview()
+        
+        # Buttons
+        button_frame = tk.Frame(main_frame, bg='#1a1a1a')
+        button_frame.pack(fill=tk.X)
+        
+        def create_note():
+            """Create note with selected template"""
+            selection = template_listbox.curselection()
+            if selection:
+                template_name = template_names[selection[0]]
+                template_content = self.template_manager.get_template_content(template_name)
+                
+                # Format template with current values
+                formatted_content = template_content.format(
+                    title=self.note_title,
+                    author=self.author_name,
+                    date=datetime.now().strftime('%Y-%m-%d %H:%M')
+                )
+                
+                # Insert into text area
+                self.text_area.delete(1.0, tk.END)
+                self.text_area.insert(1.0, formatted_content)
+                
+                # Auto-save with title as filename
+                safe_filename = "".join(c for c in self.note_title if c.isalnum() or c in (' ', '-', '_')).rstrip()
+                self.current_file = os.path.join(self.notes_dir, f"{safe_filename}.md")
+                self.save_note()
+                self.update_file_label()
+                self.apply_syntax_highlighting()
+                
+                template_window.destroy()
+                self.update_status(f"Created note with {template_name} template")
+            else:
+                messagebox.showwarning("No Selection", "Please select a template first.")
+        
+        def create_blank():
+            """Create blank note"""
+            self.text_area.delete(1.0, tk.END)
+            self.current_file = None
+            self.update_file_label()
+            template_window.destroy()
+            self.update_status("Created blank note")
+        
+        # Button styling
+        button_style = {
+            'font': ('Consolas', 11, 'bold'),
+            'relief': tk.FLAT,
+            'padx': 20,
+            'pady': 8
+        }
+        
+        tk.Button(button_frame, text="✓ Create with Template", command=create_note,
+                 bg='#006600', fg='white', **button_style).pack(side=tk.LEFT, padx=5)
+        
+        tk.Button(button_frame, text="📄 Create Blank", command=create_blank,
+                 bg='#333333', fg='white', **button_style).pack(side=tk.LEFT, padx=5)
+        
+        tk.Button(button_frame, text="✗ Cancel", command=template_window.destroy,
+                 bg='#660000', fg='white', **button_style).pack(side=tk.RIGHT, padx=5)
+        
+        # Keyboard shortcuts
+        template_window.bind('<Return>', lambda e: create_note())
+        template_window.bind('<Escape>', lambda e: template_window.destroy())
+        template_window.bind('<Double-Button-1>', lambda e: create_note())
+        
+        # Handle window close button
+        template_window.protocol("WM_DELETE_WINDOW", template_window.destroy)
+
+    def display_all_templates_at_startup(self):
+        """Display all available templates in the text area at startup"""
+        self.text_area.delete(1.0, tk.END)
+        
+        # Get all template names
+        template_names = self.template_manager.get_template_names()
+        
+        # Create a comprehensive template overview
+        overview_content = f"# HUD Notes - Available Templates\n\n"
+        overview_content += f"**Author:** {self.author_name}\n"
+        overview_content += f"**Date:** {datetime.now().strftime('%Y-%m-%d %H:%M')}\n"
+        overview_content += f"**Templates Available:** {len(template_names)}\n\n"
+        overview_content += "---\n\n"
+        overview_content += "## Quick Start Guide\n\n"
+        overview_content += "• Press **Ctrl+Alt+N** or click **●** for new note with template selection\n"
+        overview_content += "• Press **Ctrl+Alt+O** or click **▲** to open existing note\n"
+        overview_content += "• Press **Ctrl+Alt+S** or click **■** to save current note\n"
+        overview_content += "• Press **Ctrl+Alt+C** or click **</>** for code input window\n"
+        overview_content += "• Press **Ctrl+Alt+G** or click **⚙** for settings\n\n"
+        overview_content += "---\n\n"
+        overview_content += "## Available Templates\n\n"
+        
+        # Add each template with preview
+        for i, template_name in enumerate(sorted(template_names), 1):
+            template_content = self.template_manager.get_template_content(template_name)
+            
+            # Format the template to show structure
+            formatted_template = template_content.format(
+                title=f"Example {template_name}",
+                author=self.author_name,
+                date=datetime.now().strftime('%Y-%m-%d %H:%M')
+            )
+            
+            overview_content += f"### {i}. {template_name}\n\n"
+            overview_content += f"**Description:** {self.get_template_description(template_name)}\n\n"
+            overview_content += "**Preview:**\n"
+            overview_content += "```markdown\n"
+            # Show first few lines of template
+            lines = formatted_template.split('\n')
+            preview_lines = lines[:8] if len(lines) > 8 else lines
+            overview_content += '\n'.join(preview_lines)
+            if len(lines) > 8:
+                overview_content += "\n[... rest of template ...]"
+            overview_content += "\n```\n\n"
+            overview_content += "---\n\n"
+        
+        # Add footer
+        overview_content += "## Getting Started\n\n"
+        overview_content += "1. **Choose a template** by pressing **Ctrl+Alt+N** (New Note)\n"
+        overview_content += "2. **Select from the list** of available templates\n"
+        overview_content += "3. **Start writing** - your content will auto-save\n"
+        overview_content += "4. **Customize appearance** in Settings (⚙)\n\n"
+        overview_content += "**Tip:** You can create custom templates by adding `.md` files to the `templates/` directory!\n\n"
+        overview_content += f"**Templates Directory:** `{self.templates_dir}`\n\n"
+        overview_content += "---\n\n"
+        overview_content += "*Welcome to HUD Notes! This overview will be replaced when you create your first note.*"
+        
+        # Insert the overview content
+        self.text_area.insert(1.0, overview_content)
+        
+        # Apply syntax highlighting
+        self.apply_syntax_highlighting()
+        
+        # Update status and file label
+        self.current_file = None
+        self.update_file_label()
+        self.update_status(f"Template overview loaded - {len(template_names)} templates available")
+
+    def get_template_description(self, template_name):
+        """Get a description for each template type"""
+        descriptions = {
+            'Basic': 'Simple note template with title, author, and date',
+            'Meeting': 'Meeting notes with attendees, agenda, and action items',
+            'Daily Log': 'Daily planning with goals, completed tasks, and reflections',
+            'Code Review': 'Code review checklist with repository and branch info',
+            'Ctf Writeup': 'Capture The Flag challenge documentation',
+            'Class Notes': 'Academic note-taking with structured sections',
+            'Study Session': 'Study planning and progress tracking',
+            'Project Planning': 'Project management with timelines and resources',
+            'Bug Report': 'Bug tracking and resolution workflow',
+            'Powershell Script': 'Windows PowerShell script documentation',
+            'Batch Script': 'Windows batch file documentation'
+        }
+        
+        return descriptions.get(template_name, 'Custom template for specialized note-taking')
 
     def get_display_settings(self):
         """Get current display settings and DPI scaling"""
@@ -562,6 +811,9 @@ class NoteOverlay:
         self.setup_theme()
         self.create_hud_interface()
         
+        # Add custom resize handles
+        self.create_resize_handles()
+        
         self.root.attributes('-alpha', self.config['hud_transparency'])
         
         self.root.bind('<Escape>', lambda e: self.hide_overlay())
@@ -579,10 +831,37 @@ class NoteOverlay:
         
         self.root.configure(bg=self.bg_color)
 
+    def create_tooltip(self, widget, text):
+        """Create tooltip for widget"""
+        def show_tooltip(event):
+            tooltip = tk.Toplevel()
+            tooltip.wm_overrideredirect(True)
+            tooltip.configure(bg='#2a2a2a', relief=tk.SOLID, bd=1)
+            
+            label = tk.Label(tooltip, text=text, bg='#2a2a2a', fg='#ffffff',
+                           font=('Consolas', 9), padx=8, pady=4)
+            label.pack()
+            
+            # Position tooltip near cursor
+            x = event.x_root + 10
+            y = event.y_root - 10
+            tooltip.geometry(f"+{x}+{y}")
+            
+            # Store tooltip reference
+            widget.tooltip = tooltip
+            
+        def hide_tooltip(event):
+            if hasattr(widget, 'tooltip'):
+                widget.tooltip.destroy()
+                delattr(widget, 'tooltip')
+        
+        widget.bind('<Enter>', show_tooltip)
+        widget.bind('<Leave>', hide_tooltip)
+
     def create_hud_interface(self):
         """Create streamlined HUD interface"""
-        title_height = max(30, int(30 * self.dpi_scale))
-        button_size = max(2, int(2 * self.dpi_scale))
+        title_height = max(35, int(35 * self.dpi_scale))
+        button_size = max(3, int(3 * self.dpi_scale))
         title_font_size = max(8, int(10 * self.dpi_scale))
         
         # Title bar with drag functionality
@@ -620,49 +899,81 @@ class NoteOverlay:
         drag_label.bind('<ButtonRelease-1>', self.stop_drag)
         drag_label.bind('<Double-Button-1>', self.reset_to_quarter_screen)
         
-        # Control buttons
+        # Control buttons - larger and with tooltips
         controls = tk.Frame(title_frame, bg='#333333')
         controls.pack(side=tk.RIGHT, padx=5)
         
-        button_font_size = max(8, int(8 * self.dpi_scale))
+        button_font_size = max(10, int(10 * self.dpi_scale))
+        button_width = max(3, int(3.5 * self.dpi_scale))
+        button_height = max(1, int(1.2 * self.dpi_scale))
         
         # Font controls
-        tk.Button(controls, text="A-", command=self.decrease_font,
+        font_minus_btn = tk.Button(controls, text="A-", command=self.decrease_font,
                  bg=self.button_bg, fg='#ffcc00', font=('Arial', button_font_size, 'bold'),
-                 width=button_size, height=1, relief=tk.FLAT).pack(side=tk.LEFT, padx=1)
+                 width=button_width, height=button_height, relief=tk.FLAT)
+        font_minus_btn.pack(side=tk.LEFT, padx=1)
+        self.create_tooltip(font_minus_btn, "Decrease Font Size")
         
-        tk.Button(controls, text="A+", command=self.increase_font,
+        font_plus_btn = tk.Button(controls, text="A+", command=self.increase_font,
                  bg=self.button_bg, fg='#ffcc00', font=('Arial', button_font_size, 'bold'),
-                 width=button_size, height=1, relief=tk.FLAT).pack(side=tk.LEFT, padx=1)
+                 width=button_width, height=button_height, relief=tk.FLAT)
+        font_plus_btn.pack(side=tk.LEFT, padx=1)
+        self.create_tooltip(font_plus_btn, "Increase Font Size")
         
-        # Other controls
-        tk.Button(controls, text="</>", command=self.open_code_window,
+        # Other controls with tooltips
+        code_btn = tk.Button(controls, text="</>", command=self.open_code_window,
                  bg=self.button_bg, fg='#00ccff', font=('Arial', button_font_size, 'bold'),
-                 width=button_size, height=1, relief=tk.FLAT).pack(side=tk.LEFT, padx=1)
+                 width=button_width, height=button_height, relief=tk.FLAT)
+        code_btn.pack(side=tk.LEFT, padx=1)
+        self.create_tooltip(code_btn, "Code Input Window")
         
-        tk.Button(controls, text="●", command=self.new_note,
+        new_btn = tk.Button(controls, text="●", command=self.new_note,
                  bg=self.button_bg, fg='#ffff00', font=('Arial', button_font_size, 'bold'),
-                 width=button_size, height=1, relief=tk.FLAT).pack(side=tk.LEFT, padx=1)
+                 width=button_width, height=button_height, relief=tk.FLAT)
+        new_btn.pack(side=tk.LEFT, padx=1)
+        self.create_tooltip(new_btn, "New Note (with Template)")
         
-        tk.Button(controls, text="▲", command=self.open_note,
+        open_btn = tk.Button(controls, text="▲", command=self.open_note,
                  bg=self.button_bg, fg='#00ffff', font=('Arial', button_font_size, 'bold'),
-                 width=button_size, height=1, relief=tk.FLAT).pack(side=tk.LEFT, padx=1)
+                 width=button_width, height=button_height, relief=tk.FLAT)
+        open_btn.pack(side=tk.LEFT, padx=1)
+        self.create_tooltip(open_btn, "Open Note")
         
-        tk.Button(controls, text="■", command=self.save_note,
+        save_btn = tk.Button(controls, text="■", command=self.save_note,
                  bg=self.button_bg, fg='#00ff00', font=('Arial', button_font_size, 'bold'),
-                 width=button_size, height=1, relief=tk.FLAT).pack(side=tk.LEFT, padx=1)
+                 width=button_width, height=button_height, relief=tk.FLAT)
+        save_btn.pack(side=tk.LEFT, padx=1)
+        self.create_tooltip(save_btn, "Save Note")
         
-        tk.Button(controls, text="◊", command=self.toggle_preview,
+        saveas_btn = tk.Button(controls, text="▫", command=self.save_as_note,
+                 bg=self.button_bg, fg='#00cc00', font=('Arial', button_font_size, 'bold'),
+                 width=button_width, height=button_height, relief=tk.FLAT)
+        saveas_btn.pack(side=tk.LEFT, padx=1)
+        self.create_tooltip(saveas_btn, "Save As...")
+        
+        preview_btn = tk.Button(controls, text="◊", command=self.toggle_preview,
                  bg=self.button_bg, fg='#ff00ff', font=('Arial', button_font_size, 'bold'),
-                 width=button_size, height=1, relief=tk.FLAT).pack(side=tk.LEFT, padx=1)
+                 width=button_width, height=button_height, relief=tk.FLAT)
+        preview_btn.pack(side=tk.LEFT, padx=1)
+        self.create_tooltip(preview_btn, "Toggle Preview")
         
-        tk.Button(controls, text="↻", command=self.reset_to_quarter_screen,
+        reset_btn = tk.Button(controls, text="↻", command=self.reset_to_quarter_screen,
                  bg=self.button_bg, fg='#ffaa00', font=('Arial', button_font_size, 'bold'),
-                 width=button_size, height=1, relief=tk.FLAT).pack(side=tk.LEFT, padx=1)
+                 width=button_width, height=button_height, relief=tk.FLAT)
+        reset_btn.pack(side=tk.LEFT, padx=1)
+        self.create_tooltip(reset_btn, "Reset Window Position")
         
-        tk.Button(controls, text="✕", command=self.hide_overlay,
+        settings_btn = tk.Button(controls, text="⚙", command=self.open_settings,
+                 bg=self.button_bg, fg='#cccccc', font=('Arial', button_font_size, 'bold'),
+                 width=button_width, height=button_height, relief=tk.FLAT)
+        settings_btn.pack(side=tk.LEFT, padx=1)
+        self.create_tooltip(settings_btn, "Settings")
+        
+        close_btn = tk.Button(controls, text="✕", command=self.hide_overlay,
                  bg='#330000', fg='#ff0000', font=('Arial', button_font_size, 'bold'),
-                 width=button_size, height=1, relief=tk.FLAT).pack(side=tk.LEFT, padx=1)
+                 width=button_width, height=button_height, relief=tk.FLAT)
+        close_btn.pack(side=tk.LEFT, padx=1)
+        self.create_tooltip(close_btn, "Hide Overlay")
         
         # Status line
         status_height = max(20, int(20 * self.dpi_scale))
@@ -684,13 +995,17 @@ class NoteOverlay:
         tk.Label(trans_frame, text="α:", bg='#1a1a1a', fg=self.fg_color,
                 font=('Consolas', status_font_size)).pack(side=tk.LEFT)
         
-        tk.Button(trans_frame, text="-", command=self.decrease_transparency,
+        trans_minus_btn = tk.Button(trans_frame, text="-", command=self.decrease_transparency,
                  bg=self.button_bg, fg=self.fg_color, font=('Arial', status_font_size),
-                 width=button_size, height=1, relief=tk.FLAT).pack(side=tk.LEFT, padx=1)
+                 width=button_size, height=1, relief=tk.FLAT)
+        trans_minus_btn.pack(side=tk.LEFT, padx=1)
+        self.create_tooltip(trans_minus_btn, "Decrease Transparency")
         
-        tk.Button(trans_frame, text="+", command=self.increase_transparency,
+        trans_plus_btn = tk.Button(trans_frame, text="+", command=self.increase_transparency,
                  bg=self.button_bg, fg=self.fg_color, font=('Arial', status_font_size),
-                 width=button_size, height=1, relief=tk.FLAT).pack(side=tk.LEFT, padx=1)
+                 width=button_size, height=1, relief=tk.FLAT)
+        trans_plus_btn.pack(side=tk.LEFT, padx=1)
+        self.create_tooltip(trans_plus_btn, "Increase Transparency")
         
         # Main text area
         self.create_hud_editor()
@@ -790,7 +1105,7 @@ class NoteOverlay:
         import re
         
         # Headers
-        header_pattern = r'^#+\s.*$'
+        header_pattern = r'^#+\s.*'
         for match in re.finditer(header_pattern, content, re.MULTILINE):
             start_pos = f"1.0+{match.start()}c"
             end_pos = f"1.0+{match.end()}c"
@@ -811,7 +1126,7 @@ class NoteOverlay:
             self.text_area.tag_add("italic", start_pos, end_pos)
         
         # List items
-        list_pattern = r'^[\s]*[-*+]\s.*$'
+        list_pattern = r'^[\s]*[-*+]\s.*'
         for match in re.finditer(list_pattern, content, re.MULTILINE):
             start_pos = f"1.0+{match.start()}c"
             end_pos = f"1.0+{match.end()}c"
@@ -893,6 +1208,7 @@ class NoteOverlay:
         self.context_menu.add_command(label="Select All", command=lambda: self.text_area.event_generate("<<SelectAll>>"))
         self.context_menu.add_separator()
         self.context_menu.add_command(label="Insert Code Block", command=self.open_code_window)
+        self.context_menu.add_command(label="New Note (Template)", command=self.new_note)
         
         def show_context_menu(event):
             try:
@@ -902,43 +1218,722 @@ class NoteOverlay:
         
         self.text_area.bind("<Button-3>", show_context_menu)
 
-    def load_last_file_or_create_new(self):
-        """Load the last opened file or create new with template"""
-        if self.config.get('last_file') and os.path.exists(self.config['last_file']):
-            try:
-                with open(self.config['last_file'], 'r', encoding='utf-8') as f:
-                    content = f.read()
-                
-                self.text_area.insert(1.0, content)
-                self.current_file = self.config['last_file']
-                self.update_file_label()
-                self.apply_syntax_highlighting()
-                
-            except:
-                self.create_new_note_with_template()
+    def create_resize_handles(self):
+        """Create custom resize handles for the window"""
+        self.resize_border_width = 8
+        self.resizing = False
+        self.resize_direction = None
+        
+        # Bind mouse events for resize detection
+        self.root.bind('<Motion>', self.on_mouse_motion)
+        self.root.bind('<Button-1>', self.on_mouse_click)
+        self.root.bind('<B1-Motion>', self.on_mouse_drag)
+        self.root.bind('<ButtonRelease-1>', self.on_mouse_release)
+        
+    def on_mouse_motion(self, event):
+        """Handle mouse motion for resize cursor changes"""
+        if self.resizing or hasattr(self, 'dragging') and self.dragging:
+            return
+            
+        x, y = event.x, event.y
+        width = self.root.winfo_width()
+        height = self.root.winfo_height()
+        
+        # Skip if in title bar area (for dragging)
+        title_height = max(35, int(35 * self.dpi_scale))
+        if y <= title_height:
+            self.resize_direction = None
+            return
+        
+        # Determine resize direction based on mouse position
+        cursor = ""
+        self.resize_direction = None
+        
+        # Right edge
+        if width - self.resize_border_width <= x <= width:
+            if height - self.resize_border_width <= y <= height:
+                cursor = "bottom_right_corner"
+                self.resize_direction = "se"
+            elif title_height <= y <= self.resize_border_width + title_height:
+                cursor = "top_right_corner"
+                self.resize_direction = "ne"
+            else:
+                cursor = "sb_h_double_arrow"
+                self.resize_direction = "e"
+        
+        # Left edge
+        elif 0 <= x <= self.resize_border_width:
+            if height - self.resize_border_width <= y <= height:
+                cursor = "bottom_left_corner"
+                self.resize_direction = "sw"
+            elif title_height <= y <= self.resize_border_width + title_height:
+                cursor = "top_left_corner"
+                self.resize_direction = "nw"
+            else:
+                cursor = "sb_h_double_arrow"
+                self.resize_direction = "w"
+        
+        # Bottom edge
+        elif height - self.resize_border_width <= y <= height:
+            cursor = "sb_v_double_arrow"
+            self.resize_direction = "s"
+        
+        # Top edge (below title bar)
+        elif title_height <= y <= self.resize_border_width + title_height:
+            cursor = "sb_v_double_arrow"
+            self.resize_direction = "n"
+        
         else:
-            self.create_new_note_with_template()
+            cursor = ""
+            self.resize_direction = None
+        
+        self.root.config(cursor=cursor)
 
-    def create_new_note_with_template(self):
-        """Create a new note with the selected template"""
-        template_content = self.note_template.format(
-            title=self.note_title,
-            author=self.author_name,
-            date=datetime.now().strftime('%Y-%m-%d %H:%M')
-        )
+    def on_mouse_click(self, event):
+        """Handle mouse click for resize start"""
+        if self.resize_direction:
+            self.resizing = True
+            self.resize_start_x = event.x_root
+            self.resize_start_y = event.y_root
+            self.resize_start_width = self.root.winfo_width()
+            self.resize_start_height = self.root.winfo_height()
+            self.resize_start_window_x = self.root.winfo_x()
+            self.resize_start_window_y = self.root.winfo_y()
+            self.update_status("Resizing window...")
+            return "break"  # Prevent other click handlers
+
+    def on_mouse_drag(self, event):
+        """Handle mouse drag for resizing"""
+        if not self.resizing:
+            return
         
-        self.text_area.insert(1.0, template_content)
+        dx = event.x_root - self.resize_start_x
+        dy = event.y_root - self.resize_start_y
         
-        # Auto-save with title as filename
-        safe_filename = "".join(c for c in self.note_title if c.isalnum() or c in (' ', '-', '_')).rstrip()
-        self.current_file = os.path.join(self.notes_dir, f"{safe_filename}.md")
-        self.save_note()
-        self.update_file_label()
+        new_width = self.resize_start_width
+        new_height = self.resize_start_height
+        new_x = self.resize_start_window_x
+        new_y = self.resize_start_window_y
+        
+        # Minimum window size
+        min_width, min_height = 300, 200
+        
+        if 'e' in self.resize_direction:  # East (right)
+            new_width = max(min_width, self.resize_start_width + dx)
+        
+        if 'w' in self.resize_direction:  # West (left)
+            new_width = max(min_width, self.resize_start_width - dx)
+            if new_width > min_width:
+                new_x = self.resize_start_window_x + dx
+        
+        if 's' in self.resize_direction:  # South (bottom)
+            new_height = max(min_height, self.resize_start_height + dy)
+        
+        if 'n' in self.resize_direction:  # North (top)
+            new_height = max(min_height, self.resize_start_height - dy)
+            if new_height > min_height:
+                new_y = self.resize_start_window_y + dy
+        
+        # Apply the new geometry
+        self.root.geometry(f"{new_width}x{new_height}+{new_x}+{new_y}")
+
+    def on_mouse_release(self, event):
+        """Handle mouse release to end resizing"""
+        if self.resizing:
+            self.resizing = False
+            self.resize_direction = None
+            self.root.config(cursor="")
+            
+            # Update config with new size
+            geometry = self.root.geometry()
+            if '+' in geometry:
+                try:
+                    size, position = geometry.split('+', 1)
+                    width, height = size.split('x')
+                    x, y = position.split('+')
+                    self.config.update({
+                        'window_width': int(width),
+                        'window_height': int(height),
+                        'window_x': int(x),
+                        'window_y': int(y)
+                    })
+                    self.save_config()
+                    self.update_status(f"Window resized to {width}x{height}")
+                except:
+                    pass
+
+    def open_settings(self):
+        """Open settings dialog"""
+        settings_window = tk.Toplevel(self.root)
+        settings_window.title("HUD Notes Settings")
+        settings_window.geometry("600x500")
+        settings_window.configure(bg='#1a1a1a')
+        settings_window.attributes('-topmost', True)
+        settings_window.resizable(True, True)
+        
+        # Center the window
+        current_display = self.displays[self.current_display]
+        x = current_display['x'] + (current_display['width'] - 600) // 2
+        y = current_display['y'] + (current_display['height'] - 500) // 2
+        settings_window.geometry(f"600x500+{x}+{y}")
+        
+        # Ensure it shows properly
+        settings_window.deiconify()
+        settings_window.lift()
+        settings_window.focus_force()
+        
+        # Main frame with scrollable content
+        main_frame = tk.Frame(settings_window, bg='#1a1a1a')
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+        
+        # Title
+        title_label = tk.Label(main_frame, text="⚙ HUD Notes Settings", 
+                              bg='#1a1a1a', fg='#00ff41',
+                              font=('Consolas', 16, 'bold'))
+        title_label.pack(pady=(0, 20))
+        
+        # Create notebook for tabs
+        notebook = ttk.Notebook(main_frame)
+        notebook.pack(fill=tk.BOTH, expand=True, pady=(0, 20))
+        
+        # Configure notebook style
+        style = ttk.Style()
+        style.theme_use('clam')
+        style.configure('TNotebook', background='#1a1a1a', borderwidth=0)
+        style.configure('TNotebook.Tab', background='#333333', foreground='#ffffff', 
+                       padding=[20, 8], borderwidth=1)
+        style.map('TNotebook.Tab', background=[('selected', '#00ff41'), ('active', '#555555')],
+                 foreground=[('selected', '#000000')])
+        
+        # Colors Tab
+        colors_frame = tk.Frame(notebook, bg='#1a1a1a')
+        notebook.add(colors_frame, text='Colors & Theme')
+        
+        self.create_colors_tab(colors_frame)
+        
+        # Hotkeys Tab
+        hotkeys_frame = tk.Frame(notebook, bg='#1a1a1a')
+        notebook.add(hotkeys_frame, text='Hotkeys')
+        
+        self.create_hotkeys_tab(hotkeys_frame)
+        
+        # Advanced Tab (placeholder)
+        advanced_frame = tk.Frame(notebook, bg='#1a1a1a')
+        notebook.add(advanced_frame, text='Advanced')
+        
+        self.create_advanced_tab(advanced_frame)
+        
+        # Buttons frame
+        button_frame = tk.Frame(main_frame, bg='#1a1a1a')
+        button_frame.pack(fill=tk.X)
+        
+        def apply_settings():
+            """Apply settings and close dialog"""
+            self.apply_color_settings()
+            self.apply_hotkey_settings()
+            self.apply_advanced_settings()
+            self.save_config()
+            settings_window.destroy()
+            self.update_status("Settings applied")
+        
+        def reset_defaults():
+            """Reset to default settings"""
+            if messagebox.askyesno("Reset Settings", 
+                                  "Reset all settings to defaults? This cannot be undone."):
+                self.reset_default_settings()
+                settings_window.destroy()
+                self.open_settings()  # Reopen with defaults
+        
+        # Button styling
+        button_style = {
+            'font': ('Consolas', 11, 'bold'),
+            'relief': tk.FLAT,
+            'padx': 20,
+            'pady': 8
+        }
+        
+        tk.Button(button_frame, text="✓ Apply & Close", command=apply_settings,
+                 bg='#006600', fg='white', **button_style).pack(side=tk.LEFT, padx=5)
+        
+        tk.Button(button_frame, text="🔄 Reset Defaults", command=reset_defaults,
+                 bg='#cc6600', fg='white', **button_style).pack(side=tk.LEFT, padx=5)
+        
+        tk.Button(button_frame, text="✗ Cancel", command=settings_window.destroy,
+                 bg='#660000', fg='white', **button_style).pack(side=tk.RIGHT, padx=5)
+        
+        # Keyboard shortcuts
+        settings_window.bind('<Return>', lambda e: apply_settings())
+        settings_window.bind('<Escape>', lambda e: settings_window.destroy())
+        
+        # Handle window close button
+        settings_window.protocol("WM_DELETE_WINDOW", settings_window.destroy)
+
+    def create_colors_tab(self, parent):
+        """Create colors and theme settings tab"""
+        # Color schemes
+        schemes_frame = tk.LabelFrame(parent, text="Color Schemes", 
+                                     bg='#1a1a1a', fg='#00ff41',
+                                     font=('Consolas', 12, 'bold'))
+        schemes_frame.pack(fill=tk.X, padx=10, pady=10)
+        
+        self.color_scheme_var = tk.StringVar(value=self.config.get('color_scheme', 'Matrix Green'))
+        
+        color_schemes = {
+            'Matrix Green': {'bg': '#0a0a0a', 'fg': '#00ff41', 'accent': '#ff6600', 'select': '#1a3d1a'},
+            'Cyber Blue': {'bg': '#0a0a1a', 'fg': '#00ccff', 'accent': '#ff6600', 'select': '#1a1a3d'},
+            'Neon Purple': {'bg': '#1a0a1a', 'fg': '#cc00ff', 'accent': '#ffff00', 'select': '#3d1a3d'},
+            'Hacker Orange': {'bg': '#1a1a0a', 'fg': '#ff9900', 'accent': '#00ff00', 'select': '#3d3d1a'},
+            'Terminal White': {'bg': '#000000', 'fg': '#ffffff', 'accent': '#ffff00', 'select': '#333333'},
+            'Blood Red': {'bg': '#1a0000', 'fg': '#ff3333', 'accent': '#ffff00', 'select': '#3d1a1a'},
+        }
+        
+        for i, (scheme_name, colors) in enumerate(color_schemes.items()):
+            row = i // 2
+            col = i % 2
+            
+            scheme_frame = tk.Frame(schemes_frame, bg='#1a1a1a')
+            scheme_frame.grid(row=row, column=col, padx=10, pady=5, sticky='w')
+            
+            # Radio button
+            rb = tk.Radiobutton(scheme_frame, text=scheme_name, 
+                               variable=self.color_scheme_var, value=scheme_name,
+                               bg='#1a1a1a', fg='#ffffff', selectcolor='#333333',
+                               font=('Consolas', 10))
+            rb.pack(side=tk.LEFT)
+            
+            # Color preview
+            preview_frame = tk.Frame(scheme_frame, bg=colors['bg'], width=60, height=20,
+                                   relief=tk.SOLID, bd=1)
+            preview_frame.pack(side=tk.LEFT, padx=10)
+            preview_frame.pack_propagate(False)
+            
+            preview_label = tk.Label(preview_frame, text="ABC", 
+                                   bg=colors['bg'], fg=colors['fg'],
+                                   font=('Consolas', 8, 'bold'))
+            preview_label.pack(expand=True)
+        
+        # Custom colors section
+        custom_frame = tk.LabelFrame(parent, text="Custom Colors", 
+                                   bg='#1a1a1a', fg='#00ff41',
+                                   font=('Consolas', 12, 'bold'))
+        custom_frame.pack(fill=tk.X, padx=10, pady=10)
+        
+        # Store color variables
+        self.custom_bg_var = tk.StringVar(value=self.config.get('custom_bg_color', '#0a0a0a'))
+        self.custom_fg_var = tk.StringVar(value=self.config.get('custom_fg_color', '#00ff41'))
+        self.custom_accent_var = tk.StringVar(value=self.config.get('custom_accent_color', '#ff6600'))
+        
+        def choose_color(color_var, color_name):
+            """Open color chooser dialog"""
+            import tkinter.colorchooser as colorchooser
+            color = colorchooser.askcolor(initialcolor=color_var.get())
+            if color[1]:  # If user didn't cancel
+                color_var.set(color[1])
+        
+        # Background color
+        bg_frame = tk.Frame(custom_frame, bg='#1a1a1a')
+        bg_frame.pack(fill=tk.X, padx=10, pady=5)
+        
+        tk.Label(bg_frame, text="Background:", bg='#1a1a1a', fg='#ffffff',
+                font=('Consolas', 10)).pack(side=tk.LEFT)
+        
+        bg_color_btn = tk.Button(bg_frame, text="█████", 
+                               fg=self.custom_bg_var.get(), bg=self.custom_bg_var.get(),
+                               font=('Consolas', 10, 'bold'),
+                               command=lambda: choose_color(self.custom_bg_var, "Background"))
+        bg_color_btn.pack(side=tk.LEFT, padx=10)
+        
+        tk.Label(bg_frame, textvariable=self.custom_bg_var, bg='#1a1a1a', fg='#888888',
+                font=('Consolas', 9)).pack(side=tk.LEFT, padx=10)
+        
+        # Foreground color
+        fg_frame = tk.Frame(custom_frame, bg='#1a1a1a')
+        fg_frame.pack(fill=tk.X, padx=10, pady=5)
+        
+        tk.Label(fg_frame, text="Text Color:", bg='#1a1a1a', fg='#ffffff',
+                font=('Consolas', 10)).pack(side=tk.LEFT)
+        
+        fg_color_btn = tk.Button(fg_frame, text="█████", 
+                               fg=self.custom_fg_var.get(), bg=self.custom_fg_var.get(),
+                               font=('Consolas', 10, 'bold'),
+                               command=lambda: choose_color(self.custom_fg_var, "Text"))
+        fg_color_btn.pack(side=tk.LEFT, padx=10)
+        
+        tk.Label(fg_frame, textvariable=self.custom_fg_var, bg='#1a1a1a', fg='#888888',
+                font=('Consolas', 9)).pack(side=tk.LEFT, padx=10)
+        
+        # Accent color
+        accent_frame = tk.Frame(custom_frame, bg='#1a1a1a')
+        accent_frame.pack(fill=tk.X, padx=10, pady=5)
+        
+        tk.Label(accent_frame, text="Accent Color:", bg='#1a1a1a', fg='#ffffff',
+                font=('Consolas', 10)).pack(side=tk.LEFT)
+        
+        accent_color_btn = tk.Button(accent_frame, text="█████", 
+                                   fg=self.custom_accent_var.get(), bg=self.custom_accent_var.get(),
+                                   font=('Consolas', 10, 'bold'),
+                                   command=lambda: choose_color(self.custom_accent_var, "Accent"))
+        accent_color_btn.pack(side=tk.LEFT, padx=10)
+        
+        tk.Label(accent_frame, textvariable=self.custom_accent_var, bg='#1a1a1a', fg='#888888',
+                font=('Consolas', 9)).pack(side=tk.LEFT, padx=10)
+
+    def create_hotkeys_tab(self, parent):
+        """Create hotkeys settings tab"""
+        # Instructions
+        instructions = tk.Label(parent, 
+                               text="Click on a hotkey field and press your desired key combination.\n"
+                                   "Use combinations like Ctrl+Alt+T, Ctrl+Shift+N, etc.",
+                               bg='#1a1a1a', fg='#cccccc', font=('Consolas', 10),
+                               justify=tk.LEFT, wraplength=550)
+        instructions.pack(pady=10, padx=10, anchor='w')
+        
+        # Hotkeys frame
+        hotkeys_frame = tk.Frame(parent, bg='#1a1a1a')
+        hotkeys_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        # Default hotkeys
+        default_hotkeys = {
+            'toggle_overlay': 'Ctrl+Alt+T',
+            'new_note': 'Ctrl+Alt+N',
+            'open_note': 'Ctrl+Alt+O',
+            'save_note': 'Ctrl+Alt+S',
+            'save_as': 'Ctrl+Alt+Shift+S',
+            'code_window': 'Ctrl+Alt+C',
+            'toggle_preview': 'Ctrl+Alt+P',
+            'reset_position': 'Ctrl+Alt+R',
+            'move_corner_1': 'Ctrl+Alt+1',
+            'move_corner_2': 'Ctrl+Alt+2',
+            'move_corner_3': 'Ctrl+Alt+3',
+            'move_corner_4': 'Ctrl+Alt+4',
+            'center_window': 'Ctrl+Alt+5',
+        }
+        
+        # Store hotkey variables
+        self.hotkey_vars = {}
+        
+        hotkey_descriptions = {
+            'toggle_overlay': 'Toggle HUD Overlay',
+            'new_note': 'New Note',
+            'open_note': 'Open Note',
+            'save_note': 'Save Note',
+            'save_as': 'Save As...',
+            'code_window': 'Code Input Window',
+            'toggle_preview': 'Toggle Preview',
+            'reset_position': 'Reset Window Position',
+            'move_corner_1': 'Move to Top-Left',
+            'move_corner_2': 'Move to Top-Right',
+            'move_corner_3': 'Move to Bottom-Left',
+            'move_corner_4': 'Move to Bottom-Right',
+            'center_window': 'Center Window',
+        }
+        
+        for i, (key, description) in enumerate(hotkey_descriptions.items()):
+            row_frame = tk.Frame(hotkeys_frame, bg='#1a1a1a')
+            row_frame.pack(fill=tk.X, pady=2)
+            
+            # Description
+            desc_label = tk.Label(row_frame, text=description + ":", 
+                                 bg='#1a1a1a', fg='#ffffff',
+                                 font=('Consolas', 10), width=20, anchor='w')
+            desc_label.pack(side=tk.LEFT, padx=(0, 10))
+            
+            # Hotkey entry
+            current_hotkey = self.config.get('hotkeys', {}).get(key, default_hotkeys[key])
+            hotkey_var = tk.StringVar(value=current_hotkey)
+            self.hotkey_vars[key] = hotkey_var
+            
+            hotkey_entry = tk.Entry(row_frame, textvariable=hotkey_var,
+                                  bg='#333333', fg='#ffffff', font=('Consolas', 10),
+                                  insertbackground='#00ff41', width=20, state='readonly')
+            hotkey_entry.pack(side=tk.LEFT, padx=(0, 10))
+            
+            def bind_hotkey_capture(entry, var, action_key):
+                def capture_hotkey(event):
+                    # Capture the key combination
+                    modifiers = []
+                    if event.state & 0x4:  # Control
+                        modifiers.append('Ctrl')
+                    if event.state & 0x8:  # Alt
+                        modifiers.append('Alt')
+                    if event.state & 0x1:  # Shift
+                        modifiers.append('Shift')
+                    
+                    key = event.keysym
+                    if key not in ['Control_L', 'Control_R', 'Alt_L', 'Alt_R', 'Shift_L', 'Shift_R']:
+                        hotkey_string = '+'.join(modifiers + [key])
+                        var.set(hotkey_string)
+                        entry.config(state='readonly')
+                
+                def enable_capture(event):
+                    entry.config(state='normal')
+                    entry.delete(0, tk.END)
+                    entry.insert(0, "Press key combination...")
+                    entry.bind('<KeyPress>', capture_hotkey)
+                
+                entry.bind('<Button-1>', enable_capture)
+            
+            bind_hotkey_capture(hotkey_entry, hotkey_var, key)
+            
+            # Reset button
+            reset_btn = tk.Button(row_frame, text="Reset", 
+                                command=lambda k=key: self.hotkey_vars[k].set(default_hotkeys[k]),
+                                bg='#555555', fg='#ffffff', font=('Consolas', 8),
+                                relief=tk.FLAT, padx=10, pady=2)
+            reset_btn.pack(side=tk.LEFT)
+
+    def create_advanced_tab(self, parent):
+        """Create advanced settings tab"""
+        # Auto-show/hide settings
+        autohide_frame = tk.LabelFrame(parent, text="Auto Show/Hide Features", 
+                                     bg='#1a1a1a', fg='#00ff41',
+                                     font=('Consolas', 12, 'bold'))
+        autohide_frame.pack(fill=tk.X, padx=10, pady=10)
+        
+        # Mouse hover trigger
+        hover_frame = tk.Frame(autohide_frame, bg='#1a1a1a')
+        hover_frame.pack(fill=tk.X, padx=10, pady=10)
+        
+        self.mouse_hover_var = tk.BooleanVar(value=self.config.get('mouse_hover_show', False))
+        hover_cb = tk.Checkbutton(hover_frame, text="Show overlay when hovering top-left corner", 
+                              variable=self.mouse_hover_var,
+                              bg='#1a1a1a', fg='#ffffff', selectcolor='#333333',
+                              font=('Consolas', 10))
+        hover_cb.pack(anchor='w')
+        
+        hover_desc = tk.Label(hover_frame, 
+                            text="When overlay is hidden, hover mouse in top-left corner (50x50 pixels) to show it",
+                            bg='#1a1a1a', fg='#888888', font=('Consolas', 9),
+                            wraplength=500, justify=tk.LEFT)
+        hover_desc.pack(anchor='w', padx=20, pady=(5, 0))
+        
+        # Click outside to hide
+        clickhide_frame = tk.Frame(autohide_frame, bg='#1a1a1a')
+        clickhide_frame.pack(fill=tk.X, padx=10, pady=10)
+        
+        self.click_hide_var = tk.BooleanVar(value=self.config.get('click_outside_hide', False))
+        click_cb = tk.Checkbutton(clickhide_frame, text="Hide overlay when clicking outside", 
+                              variable=self.click_hide_var,
+                              bg='#1a1a1a', fg='#ffffff', selectcolor='#333333',
+                              font=('Consolas', 10))
+        click_cb.pack(anchor='w')
+        
+        click_desc = tk.Label(clickhide_frame, 
+                            text="Click anywhere outside the overlay window to hide it automatically",
+                            bg='#1a1a1a', fg='#888888', font=('Consolas', 9),
+                            wraplength=500, justify=tk.LEFT)
+        click_desc.pack(anchor='w', padx=20, pady=(5, 0))
+        
+        # Separator
+        separator = tk.Frame(parent, bg='#333333', height=2)
+        separator.pack(fill=tk.X, padx=20, pady=20)
+        
+        # Future features placeholder
+        placeholder_frame = tk.Frame(parent, bg='#1a1a1a')
+        placeholder_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
+        
+        tk.Label(placeholder_frame, text="🚧 Future Advanced Features", 
+                bg='#1a1a1a', fg='#00ff41',
+                font=('Consolas', 14, 'bold')).pack(pady=(0, 15))
+        
+        tk.Label(placeholder_frame, 
+                text="Additional features planned for future releases:\n\n"
+                     "• Plugin system configuration\n"
+                     "• Advanced syntax highlighting rules\n"
+                     "• Custom template variables\n"
+                     "• Export/import settings\n"
+                     "• Performance optimization options\n"
+                     "• Integration with external tools\n"
+                     "• Auto-backup settings\n"
+                     "• Multiple window profiles\n\n"
+                     "Have suggestions? Let us know!",
+                bg='#1a1a1a', fg='#cccccc', font=('Consolas', 10),
+                justify=tk.LEFT).pack(anchor='w')
+
+    def apply_color_settings(self):
+        """Apply selected color scheme"""
+        scheme = self.color_scheme_var.get()
+        
+        color_schemes = {
+            'Matrix Green': {'bg': '#0a0a0a', 'fg': '#00ff41', 'accent': '#ff6600', 'select': '#1a3d1a'},
+            'Cyber Blue': {'bg': '#0a0a1a', 'fg': '#00ccff', 'accent': '#ff6600', 'select': '#1a1a3d'},
+            'Neon Purple': {'bg': '#1a0a1a', 'fg': '#cc00ff', 'accent': '#ffff00', 'select': '#3d1a3d'},
+            'Hacker Orange': {'bg': '#1a1a0a', 'fg': '#ff9900', 'accent': '#00ff00', 'select': '#3d3d1a'},
+            'Terminal White': {'bg': '#000000', 'fg': '#ffffff', 'accent': '#ffff00', 'select': '#333333'},
+            'Blood Red': {'bg': '#1a0000', 'fg': '#ff3333', 'accent': '#ffff00', 'select': '#3d1a1a'},
+        }
+        
+        if scheme in color_schemes:
+            colors = color_schemes[scheme]
+            self.config['color_scheme'] = scheme
+            self.config['bg_color'] = colors['bg']
+            self.config['fg_color'] = colors['fg']
+            self.config['accent_color'] = colors['accent']
+            self.config['select_bg'] = colors['select']
+        else:
+            # Custom colors
+            self.config['color_scheme'] = 'Custom'
+            self.config['bg_color'] = self.custom_bg_var.get()
+            self.config['fg_color'] = self.custom_fg_var.get()
+            self.config['accent_color'] = self.custom_accent_var.get()
+            self.config['select_bg'] = '#333333'
+        
+        # Apply colors immediately
+        self.apply_theme_colors()
+
+    def apply_hotkey_settings(self):
+        """Apply hotkey settings"""
+        hotkeys = {}
+        for key, var in self.hotkey_vars.items():
+            hotkeys[key] = var.get()
+        
+        self.config['hotkeys'] = hotkeys
+        # Note: Hotkey rebinding would require restarting the global hotkey listener
+
+    def apply_advanced_settings(self):
+        """Apply advanced settings"""
+        # Apply auto show/hide settings
+        self.config['mouse_hover_show'] = self.mouse_hover_var.get()
+        self.config['click_outside_hide'] = self.click_hide_var.get()
+        
+        # Setup or remove mouse hover monitoring
+        if self.config['mouse_hover_show']:
+            self.setup_mouse_hover_monitor()
+        else:
+            self.stop_mouse_hover_monitor()
+        
+        # Setup or remove click outside monitoring
+        if self.config['click_outside_hide']:
+            self.setup_click_outside_monitor()
+        else:
+            self.stop_click_outside_monitor()
+
+    def apply_theme_colors(self):
+        """Apply current theme colors to the interface"""
+        # Update theme colors
+        self.bg_color = self.config.get('bg_color', '#0a0a0a')
+        self.fg_color = self.config.get('fg_color', '#00ff41')
+        self.accent_color = self.config.get('accent_color', '#ff6600')
+        self.select_bg = self.config.get('select_bg', '#1a3d1a')
+        
+        # Apply to root window
+        self.root.configure(bg=self.bg_color)
+        
+        # Apply to text area
+        self.text_area.configure(bg=self.bg_color, fg=self.fg_color, 
+                                selectbackground=self.select_bg,
+                                insertbackground=self.fg_color)
+        
+        # Apply to file label
+        self.file_label.configure(fg=self.accent_color)
+        
+        # Apply to status label
+        self.status_label.configure(bg='#1a1a1a', fg=self.fg_color)
+        
+        # Reapply syntax highlighting with new colors
+        self.setup_syntax_highlighting()
         self.apply_syntax_highlighting()
 
-    # Continue with the rest of the methods...
-    # (Including all the window management, hotkey setup, file operations, etc.)
-    # [I'll include these in the next part due to length constraints]
+    def reset_default_settings(self):
+        """Reset all settings to defaults"""
+        defaults = {
+            'color_scheme': 'Matrix Green',
+            'bg_color': '#0a0a0a',
+            'fg_color': '#00ff41',
+            'accent_color': '#ff6600',
+            'select_bg': '#1a3d1a',
+            'mouse_hover_show': False,
+            'click_outside_hide': False,
+            'hotkeys': {
+                'toggle_overlay': 'Ctrl+Alt+T',
+                'new_note': 'Ctrl+Alt+N',
+                'open_note': 'Ctrl+Alt+O',
+                'save_note': 'Ctrl+Alt+S',
+                'save_as': 'Ctrl+Alt+Shift+S',
+                'code_window': 'Ctrl+Alt+C',
+                'toggle_preview': 'Ctrl+Alt+P',
+                'reset_position': 'Ctrl+Alt+R',
+                'move_corner_1': 'Ctrl+Alt+1',
+                'move_corner_2': 'Ctrl+Alt+2',
+                'move_corner_3': 'Ctrl+Alt+3',
+                'move_corner_4': 'Ctrl+Alt+4',
+                'center_window': 'Ctrl+Alt+5',
+            }
+        }
+        
+        for key, value in defaults.items():
+            self.config[key] = value
+        
+        self.apply_theme_colors()
+        self.save_config()
+        self.update_status("Settings reset to defaults")
+
+    def setup_mouse_hover_monitor(self):
+        """Setup mouse hover monitoring for top-left corner"""
+        if hasattr(self, 'hover_monitor_thread') and self.hover_monitor_thread.is_alive():
+            return
+        
+        self.hover_monitor_active = True
+        
+        def hover_monitor():
+            import time
+            while self.hover_monitor_active:
+                try:
+                    if not self.overlay_visible:
+                        # Get mouse position
+                        mouse_x = self.root.winfo_pointerx()
+                        mouse_y = self.root.winfo_pointery()
+                        
+                        # Check if mouse is in top-left corner (50x50 pixels)
+                        if mouse_x <= 50 and mouse_y <= 50:
+                            # Show overlay
+                            self.root.after(0, self.show_overlay)
+                            time.sleep(1)  # Prevent rapid toggling
+                    
+                    time.sleep(0.1)  # Check every 100ms
+                except Exception as e:
+                    print(f"Hover monitor error: {e}")
+                    break
+        
+        self.hover_monitor_thread = threading.Thread(target=hover_monitor, daemon=True)
+        self.hover_monitor_thread.start()
+
+    def stop_mouse_hover_monitor(self):
+        """Stop mouse hover monitoring"""
+        self.hover_monitor_active = False
+        if hasattr(self, 'hover_monitor_thread'):
+            try:
+                self.hover_monitor_thread.join(timeout=1)
+            except:
+                pass
+
+    def setup_click_outside_monitor(self):
+        """Setup click outside monitoring"""
+        def on_global_click(x, y, button, pressed):
+            if pressed and self.overlay_visible:
+                # Get overlay window bounds
+                try:
+                    win_x = self.root.winfo_x()
+                    win_y = self.root.winfo_y()
+                    win_width = self.root.winfo_width()
+                    win_height = self.root.winfo_height()
+                    
+                    # Check if click is outside overlay
+                    if not (win_x <= x <= win_x + win_width and win_y <= y <= win_y + win_height):
+                        # Hide overlay
+                        self.root.after(0, self.hide_overlay)
+                except:
+                    pass
+        
+        if not hasattr(self, 'click_listener') or not self.click_listener.running:
+            from pynput import mouse
+            self.click_listener = mouse.Listener(on_click=on_global_click)
+            self.click_listener.start()
+
+    def stop_click_outside_monitor(self):
+        """Stop click outside monitoring"""
+        if hasattr(self, 'click_listener') and self.click_listener.running:
+            self.click_listener.stop()
 
     def setup_hotkey(self):
         """Setup global hotkey"""
@@ -998,6 +1993,10 @@ class NoteOverlay:
         """Handle application closing"""
         if self.current_file and self.text_area.get(1.0, tk.END).strip():
             self.auto_save()
+        
+        # Stop advanced feature monitors
+        self.stop_mouse_hover_monitor()
+        self.stop_click_outside_monitor()
         
         if hasattr(self, 'border_windows'):
             for border in self.border_windows:
@@ -1113,13 +2112,49 @@ class NoteOverlay:
         self.root.bind('<Control-Alt-q>', lambda e: self.on_closing())
         self.root.bind('<Control-Alt-r>', lambda e: self.reset_to_quarter_screen())
         self.root.bind('<Control-Alt-m>', lambda e: self.move_to_next_display())
+        self.root.bind('<Control-Alt-g>', lambda e: self.open_settings())  # Settings hotkey
         
-        # Window positioning shortcuts
+        # Window positioning shortcuts - multiple binding formats for compatibility
+        self.root.bind('<Control-Alt-Key-1>', lambda e: self.move_to_corner('top-left'))
         self.root.bind('<Control-Alt-1>', lambda e: self.move_to_corner('top-left'))
+        self.root.bind('<Control-Alt-Key-2>', lambda e: self.move_to_corner('top-right'))
         self.root.bind('<Control-Alt-2>', lambda e: self.move_to_corner('top-right'))
+        self.root.bind('<Control-Alt-Key-3>', lambda e: self.move_to_corner('bottom-left'))
         self.root.bind('<Control-Alt-3>', lambda e: self.move_to_corner('bottom-left'))
+        self.root.bind('<Control-Alt-Key-4>', lambda e: self.move_to_corner('bottom-right'))
         self.root.bind('<Control-Alt-4>', lambda e: self.move_to_corner('bottom-right'))
+        self.root.bind('<Control-Alt-Key-5>', lambda e: self.center_window())
         self.root.bind('<Control-Alt-5>', lambda e: self.center_window())
+        
+        # Also bind to text area to ensure they work when typing
+        self.text_area.bind('<Control-Alt-Key-1>', lambda e: self.move_to_corner('top-left'))
+        self.text_area.bind('<Control-Alt-1>', lambda e: self.move_to_corner('top-left'))
+        self.text_area.bind('<Control-Alt-Key-2>', lambda e: self.move_to_corner('top-right'))
+        self.text_area.bind('<Control-Alt-2>', lambda e: self.move_to_corner('top-right'))
+        self.text_area.bind('<Control-Alt-Key-3>', lambda e: self.move_to_corner('bottom-left'))
+        self.text_area.bind('<Control-Alt-3>', lambda e: self.move_to_corner('bottom-left'))
+        self.text_area.bind('<Control-Alt-Key-4>', lambda e: self.move_to_corner('bottom-right'))
+        self.text_area.bind('<Control-Alt-4>', lambda e: self.move_to_corner('bottom-right'))
+        self.text_area.bind('<Control-Alt-Key-5>', lambda e: self.center_window())
+        self.text_area.bind('<Control-Alt-5>', lambda e: self.center_window())
+        
+        # Add debug messages for testing
+        def debug_corner_move(corner, event=None):
+            print(f"Moving to {corner}")
+            self.move_to_corner(corner)
+            return "break"  # Prevent further processing
+            
+        def debug_center(event=None):
+            print("Centering window")
+            self.center_window()
+            return "break"
+        
+        # Bind with debug versions for troubleshooting
+        self.root.bind('<Control-Alt-KeyPress-1>', lambda e: debug_corner_move('top-left', e))
+        self.root.bind('<Control-Alt-KeyPress-2>', lambda e: debug_corner_move('top-right', e))
+        self.root.bind('<Control-Alt-KeyPress-3>', lambda e: debug_corner_move('bottom-left', e))
+        self.root.bind('<Control-Alt-KeyPress-4>', lambda e: debug_corner_move('bottom-right', e))
+        self.root.bind('<Control-Alt-KeyPress-5>', lambda e: debug_center(e))
 
     def open_code_window(self):
         """Open code input window"""
@@ -1272,15 +2307,13 @@ class NoteOverlay:
         self.update_status(f"Moved to {position}")
 
     def new_note(self):
-        """Create a new note"""
+        """Create a new note with template selection"""
         if self.text_area.get(1.0, tk.END).strip():
             if messagebox.askyesno("New Note", "Save current note before creating new one?"):
                 self.save_note()
         
-        self.text_area.delete(1.0, tk.END)
-        self.current_file = None
-        self.update_file_label()
-        self.update_status("New note created")
+        # Show template selection dialog
+        self.show_template_selection()
 
     def open_note(self):
         """Open an existing note"""
@@ -1470,9 +2503,9 @@ def main():
     if len(sys.argv) > 1:
         arg = sys.argv[1].lower()
         if arg in ['--version', '-v']:
-            print("HUD Notes v1.0.0")
+            print("HUD Notes v1.0.3")
             print("A HUD-style overlay note-taking application")
-            print("Author: Lahire")
+            print("Author: jLaHire")
             print("License: MIT")
             return
         elif arg in ['--help', '-h']:
@@ -1493,14 +2526,15 @@ def main():
             print("  - Default template selection")
             print("")
             print("Hotkeys:")
-            print("  Ctrl+Alt+T     Toggle HUD overlay")
-            print("  Ctrl+Alt+N     New note")
-            print("  Ctrl+Alt+O     Open note")
-            print("  Ctrl+Alt+S     Save note")
-            print("  Ctrl+Alt+C     Code input window")
-            print("  Ctrl+Alt+P     Toggle preview")
-            print("  Ctrl+Alt+M     Move to next display")
-            print("  Ctrl+Alt+R     Reset window position")
+            print("  Ctrl+Alt+t     Toggle HUD overlay")
+            print("  Ctrl+Alt+g     Settings")
+            print("  Ctrl+Alt+n     New note")
+            print("  Ctrl+Alt+o     Open note")
+            print("  Ctrl+Alt+s     Save note")
+            print("  Ctrl+Alt+c     Code input window")
+            print("  Ctrl+Alt+p     Toggle preview")
+            print("  Ctrl+Alt+m     Move to next display")
+            print("  Ctrl+Alt+r     Reset window position")
             print("  Ctrl+Alt+1-4   Move to corners")
             print("  Ctrl+Alt+5     Center window")
             print("  Esc           Hide overlay")
