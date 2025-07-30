@@ -1,6 +1,7 @@
 # HUD Notes
 
 A lightweight, HUD-style overlay note-taking application with multi-display support, syntax highlighting, and customizable templates.
+Vibe code project.
 
 ![HUD Notes Demo](screenshots/hud_notes_demo.gif)
 
@@ -27,8 +28,8 @@ A lightweight, HUD-style overlay note-taking application with multi-display supp
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/yourusername/hud-notes.git
-   cd hud-notes
+   git clone https://github.com/jlahire/HUD-note.git
+   cd HUD-note
    ```
 
 2. **Run the setup script:**
@@ -37,10 +38,8 @@ A lightweight, HUD-style overlay note-taking application with multi-display supp
    ./setup.sh
    ```
 
-3. **Follow the installer prompts:**
-   ```bash
-   ./install_hud_notes.sh
-   ```
+3. **Alias**
+   Pick your alias during installation
 
 4. **Start using HUD Notes:**
    ```bash
@@ -65,7 +64,7 @@ echo '#!/bin/bash
 exec python3 "$HOME/tools/hud-notes" "$@"' > ~/bin/hud-notes
 chmod +x ~/bin/hud-notes
 
-# Add to PATH and create alias
+# Add to PATH and create alias(if not already done during setup)
 echo 'export PATH="$HOME/bin:$PATH"' >> ~/.bashrc
 echo 'alias HUD="hud-notes"' >> ~/.bashrc
 source ~/.bashrc
