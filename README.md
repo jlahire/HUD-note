@@ -235,7 +235,7 @@ See `requirements.txt` for all dependencies:
 ### Building from Source
 
 ```bash
-git clone https://github.com/yourusername/hud-notes.git
+git clone https://github.com/jlahire/hud-notes.git
 cd hud-notes
 pip3 install -r requirements.txt
 python3 hud_notes.py
