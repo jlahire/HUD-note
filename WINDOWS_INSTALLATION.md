@@ -12,12 +12,14 @@ HUD Notes can be made globally accessible via a custom launcher and alias setup 
 
 **1. Create Directories**
 Ensure user-level directories exist:
+
 ```bash
 mkdir -p ~/bin ~/tools
 ```
 
 **2. Copy the Python Script**
 Copy `hud_notes.py` into your `~/tools` directory:
+
 ```bash
 cp path/to/hud_notes.py ~/tools/hud-notes
 ```
@@ -25,6 +27,7 @@ cp path/to/hud_notes.py ~/tools/hud-notes
 
 **3. Create the Launcher Stub**
 Create a shell wrapper in `~/bin/hud-notes`:
+
 ```bash
 echo '#!/bin/bash
 exec python3 "$HOME/tools/hud-notes" "$@"' > ~/bin/hud-notes
@@ -33,6 +36,7 @@ chmod +x ~/bin/hud-notes
 
 **4. Update .bashrc**
 Add your alias and PATH update to `.bashrc`:
+
 ```bash
 echo 'export PATH="$HOME/bin:$PATH"' >> ~/.bashrc
 echo 'alias HUD="hud-notes"' >> ~/.bashrc
@@ -41,6 +45,7 @@ source ~/.bashrc
 
 **5. Confirm Installation**
 Verify everything is set up:
+
 ```bash
 which hud-notes
 HUD --help
@@ -53,17 +58,20 @@ HUD --help
 #### Using PowerShell Profile
 
 **1. Create Tools Directory**
+
 ```powershell
 New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\tools"
 ```
 
 **2. Copy HUD Notes**
+
 ```powershell
 Copy-Item "path\to\hud_notes.py" "$env:USERPROFILE\tools\hud-notes.py"
 ```
 
 **3. Create PowerShell Function**
 Add to your PowerShell profile (`$PROFILE`):
+
 ```powershell
 # Open profile for editing
 notepad $PROFILE
@@ -79,6 +87,7 @@ function hud-notes {
 ```
 
 **4. Reload Profile**
+
 ```powershell
 . $PROFILE
 ```
@@ -90,6 +99,7 @@ function hud-notes {
 #### Ubuntu/Debian WSL
 
 **1. Install Dependencies**
+
 ```bash
 sudo apt update
 sudo apt install python3 python3-pip python3-tk
@@ -97,6 +107,7 @@ pip3 install pynput markdown2
 ```
 
 **2. Clone and Setup**
+
 ```bash
 git clone https://github.com/jlahire/HUD-note.git
 cd HUD-note
@@ -108,6 +119,7 @@ cd HUD-note
 For GUI support in WSL, install an X server like VcXsrv or Xming:
 
 Add to your `~/.bashrc`:
+
 ```bash
 export DISPLAY=:0.0
 export LIBGL_ALWAYS_INDIRECT=1
@@ -116,6 +128,7 @@ export LIBGL_ALWAYS_INDIRECT=1
 #### Kali Linux WSL
 
 **1. Install Dependencies**
+
 ```bash
 sudo apt update
 sudo apt install python3 python3-pip python3-tk
@@ -123,6 +136,7 @@ pip3 install pynput markdown2
 ```
 
 **2. Setup HUD Notes**
+
 ```bash
 git clone https://github.com/yourusername/hud-notes.git
 cd hud-notes
@@ -132,6 +146,7 @@ chmod +x *.sh
 
 **3. Kali-Specific Alias Setup**
 Add to `~/.zshrc` (Kali uses zsh by default):
+
 ```bash
 echo 'export PATH="$HOME/bin:$PATH"' >> ~/.zshrc
 echo 'alias hud="hud-notes"' >> ~/.zshrc
@@ -141,6 +156,7 @@ source ~/.zshrc
 
 **4. Security Tools Integration**
 For CTF and security work, you can create specialized templates:
+
 ```bash
 # Copy CTF template to a quick-access location
 cp templates/ctf_writeup.md ~/ctf-template.md
@@ -152,6 +168,7 @@ echo 'alias ctf-note="hud-notes ~/ctf-notes/$(date +%Y%m%d)-\$1.md"' >> ~/.zshrc
 ### WSL GUI Requirements
 
 #### Option 1: VcXsrv (Recommended)
+
 1. Download and install VcXsrv from: https://sourceforge.net/projects/vcxsrv/
 2. Start XLaunch with these settings:
    - Multiple windows
@@ -159,6 +176,7 @@ echo 'alias ctf-note="hud-notes ~/ctf-notes/$(date +%Y%m%d)-\$1.md"' >> ~/.zshrc
    - Disable access control: ✓
 
 #### Option 2: Windows 11 WSLg
+
 If you're on Windows 11, WSLg provides built-in GUI support:
 ```bash
 # No additional setup needed for Windows 11 WSL
@@ -170,6 +188,7 @@ echo $DISPLAY  # Should show something like :0
 ### Desktop Integration
 
 **Create Desktop Shortcut (Git Bash)**
+
 ```bash
 cat > ~/Desktop/HUD\ Notes.lnk << 'EOF'
 [InternetShortcut]
@@ -184,6 +203,7 @@ EOF
 ```
 
 **Start Menu Integration (PowerShell)**
+
 ```powershell
 $WshShell = New-Object -comObject WScript.Shell
 $Shortcut = $WshShell.CreateShortcut("$env:APPDATA\Microsoft\Windows\Start Menu\Programs\HUD Notes.lnk")
@@ -199,6 +219,7 @@ $Shortcut.Save()
 ### Common Problems
 
 **Python not found in Git Bash:**
+
 ```bash
 # Add Python to PATH in .bashrc
 echo 'export PATH="/c/Python39:/c/Python39/Scripts:$PATH"' >> ~/.bashrc
@@ -206,6 +227,7 @@ echo 'export PATH="/c/Python39:/c/Python39/Scripts:$PATH"' >> ~/.bashrc
 ```
 
 **Permission errors:**
+
 ```bash
 # Fix permissions for Git Bash
 chmod +x ~/bin/hud-notes
@@ -213,6 +235,7 @@ chmod +x ~/tools/hud-notes
 ```
 
 **Display issues in WSL:**
+
 ```bash
 # Test X11 forwarding
 xclock &
@@ -220,6 +243,7 @@ xclock &
 ```
 
 **Dependencies missing:**
+
 ```bash
 # Install with pip user flag
 pip3 install --user pynput markdown2
@@ -231,6 +255,7 @@ conda install pynput markdown2
 ### Windows Firewall
 
 If global hotkeys don't work, you may need to allow Python through Windows Firewall:
+
 1. Open Windows Defender Firewall
 2. Click "Allow an app or feature through Windows Defender Firewall"
 3. Add Python (python.exe) to the exceptions
@@ -238,7 +263,9 @@ If global hotkeys don't work, you may need to allow Python through Windows Firew
 ## 📝 Windows-Specific Templates
 
 ### PowerShell Script Template
+
 Create `templates/powershell_script.md`:
+
 ```markdown
 # {title}
 
@@ -278,7 +305,9 @@ param(
 
 
 ---
+
 **Tags:** #powershell #windows #script
+
 ```
 
 ### Batch File Template
@@ -311,9 +340,10 @@ script.bat
 
 ## Notes
 
-
 ---
+
 **Tags:** #batch #windows #cmd
+
 ```
 
 ## 🎯 Platform-Specific Tips
