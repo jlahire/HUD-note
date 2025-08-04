@@ -4,8 +4,8 @@ HUD Notes - Production Version
 A HUD-style overlay note-taking application with multi-display support,
 syntax highlighting, and template system.
 
-Author: Lahire
-License: MIT
+Author: jLaHire
+License: AGPL-3.0
 """
 
 import tkinter as tk
@@ -488,13 +488,13 @@ class NoteOverlay:
         }
         
         tk.Button(button_frame, text="✓ Create with Template", command=create_note,
-                 bg='#006600', fg='white', **button_style).pack(side=tk.LEFT, padx=5)
+                bg='#006600', fg='white', **button_style).pack(side=tk.LEFT, padx=5)
         
         tk.Button(button_frame, text="📄 Create Blank", command=create_blank,
-                 bg='#333333', fg='white', **button_style).pack(side=tk.LEFT, padx=5)
+                bg='#333333', fg='white', **button_style).pack(side=tk.LEFT, padx=5)
         
         tk.Button(button_frame, text="✗ Cancel", command=template_window.destroy,
-                 bg='#660000', fg='white', **button_style).pack(side=tk.RIGHT, padx=5)
+                bg='#660000', fg='white', **button_style).pack(side=tk.RIGHT, padx=5)
         
         # Keyboard shortcuts
         template_window.bind('<Return>', lambda e: create_note())
@@ -1842,7 +1842,7 @@ class NoteOverlay:
             'fg_color': '#00ff41',
             'accent_color': '#ff6600',
             'select_bg': '#1a3d1a',
-            'mouse_hover_show': False,
+            'mouse_hover_show': True,
             'click_outside_hide': False,
             'hotkeys': {
                 'toggle_overlay': 'Ctrl+Alt+T',
