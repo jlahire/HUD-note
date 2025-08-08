@@ -1,6 +1,6 @@
 # HUD Notes v2.0.0 - Modular HUD Overlay System
 
-> **🚀 Complete Architectural Overhaul** - Now with microarchitecture design and plugin-based modularity
+> **DISCLAIMER:** *This project structure and code has been designed with AI assistance. While the architecture follows software engineering best practices, please review, test, and modify the code according to your specific requirements and security standards before use in production environments. The main purpose of this project is so I can use this overlay when I'm out and about and only have my laptop screen and no extra monitors.*
 
 A powerful, customizable HUD overlay note-taking system built with Python and Tkinter. Designed for real-time note-taking during activities like CTF competitions, coding sessions, research, and learning.
 
@@ -185,6 +185,7 @@ python main.py
 ### Custom Templates
 
 Add `.md` files to your `templates/` directory with placeholders:
+
 - `{title}` - Note title
 - `{author}` - Author name  
 - `{date}` - Current date/time
@@ -238,6 +239,7 @@ function HUD { python main.py $args }
 ```
 
 ### WSL Support
+
 - **X11 Forwarding** - Use with VcXsrv or WSLg
 - **Kali Integration** - Special aliases for CTF work
 - **Template Integration** - Security-focused templates
@@ -263,6 +265,7 @@ self.themes['Your Theme'] = Theme(
 ### Creating Plugin Modules
 
 Follow the microarchitecture principles:
+
 - **One class per file** - Maximum 50-100 lines
 - **Single responsibility** - Each file handles one concept
 - **Minimal imports** - Reduce dependencies

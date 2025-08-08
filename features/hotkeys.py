@@ -74,16 +74,25 @@ class HotkeyManager:
         """Create a thread-safe wrapper for GUI actions"""
         def safe_action():
             try:
-                # Schedule the action to run in the main GUI thread
-                if hasattr(self.app, 'overlay') and self.app.overlay and self.app.overlay.root:
-                    self.app.overlay.root.after(0, action)
-                else:
-                    # Fallback - call directly if no GUI available
-                    action()
+                # Simple approach: just call the action directly
+                # The action methods should handle their own thread safety
+                action()
             except Exception as e:
                 print(f"Error executing hotkey action: {e}")
         
         return safe_action
+
+    def _process_pending_actions(self):
+        """Process any pending actions in the main thread"""
+        if hasattr(self.app, '_pending_actions') and self.app._pending_actions:
+            actions_to_process = self.app._pending_actions.copy()
+            self.app._pending_actions.clear()
+            
+            for action in actions_to_process:
+                try:
+                    action()
+                except Exception as e:
+                    print(f"Error processing pending action: {e}")
     
     def _convert_hotkey_string(self, hotkey_string: str) -> str:
         """Convert hotkey string to pynput format"""
