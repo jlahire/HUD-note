@@ -7,19 +7,22 @@ A floating note-taking overlay that stays on top of everything else. Built with 
 ## What's New
 
 ### Tab System
+
 - Open multiple notes at once in tabs
 - Each tab saves automatically
 - Click to switch between notes
 - Close tabs with the X button
 
 ### Simplified Interface
+
 - Just the buttons you actually need
 - Text size controls (T-/T+)
-- Transparency controls (O-/O+) 
+- Transparency controls (O-/O+)
 - New note, Open file, Settings
 - That's it
 
 ### Built-in Templates
+
 - No more external template files that can break
 - 11 templates built into the code
 - Just works
@@ -45,6 +48,29 @@ python main.py
 
 First run will ask where to save notes and your name. Then press `Ctrl+Alt+H` to show/hide the overlay.
 
+## Installation Options
+
+**Run directly:**
+
+```bash
+python main.py
+```
+
+**Install globally:**
+
+```bash
+./setup.sh          # One-time setup
+./install_hud_notes.sh   # Global installation
+```
+
+**Update existing installation:**
+
+```bash
+./update.sh         # Updates ~/tools/hud-notes from current directory
+```
+
+The update script creates automatic backups and logs everything to `update-YYYYMMDD.txt`.
+
 ## How to Use
 
 - **New note**: Click "New" or `Ctrl+Alt+N` - opens in new tab
@@ -59,6 +85,7 @@ First run will ask where to save notes and your name. Then press `Ctrl+Alt+H` to
 ## Templates
 
 Built-in templates for different use cases:
+
 - Basic note
 - Meeting notes
 - Daily log
@@ -74,6 +101,7 @@ Built-in templates for different use cases:
 ## Themes
 
 10+ built-in color themes:
+
 - Matrix Green (default)
 - Cyber Blue
 - Neon Purple
@@ -130,6 +158,7 @@ Settings are saved in `.note_config.json` in your notes folder. Delete this file
 ## Why This Exists
 
 I needed something that:
+
 - Stays on top during CTF competitions
 - Takes up 1/4 of my screen (right side)
 - Saves automatically so I don't lose notes
