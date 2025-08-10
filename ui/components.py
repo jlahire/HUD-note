@@ -200,14 +200,15 @@ class HUDInterface:
         button_width = self.app.display_manager.get_scaled_dimension(4)
         button_height = self.app.display_manager.get_scaled_dimension(1.5)
         
-        # Button configurations
+        # Button configurations - ADDED OPEN BUTTON FOR TAB SYSTEM
         buttons = [
-        ("T-", self.app.decrease_font, '#ffcc00', "Decrease Font Size", "Ctrl+Alt+-"),
-        ("T+", self.app.increase_font, '#ffcc00', "Increase Font Size", "Ctrl+Alt++"),
-        ("O-", self.app.increase_transparency, '#88ccff', "Decrease Transparency", "Alt+-"),
-        ("O+", self.app.decrease_transparency, '#88ccff', "Increase Transparency", "Alt++"),
-        ("New", self.app.new_note, '#ffff00', "New Note (with Template)", "Ctrl+Alt+N"),
-        ("⚙", self.app.open_settings, '#cccccc', "Settings", None)
+            ("T-", self.app.decrease_font, '#ffcc00', "Decrease Font Size", "Ctrl+Alt+-"),
+            ("T+", self.app.increase_font, '#ffcc00', "Increase Font Size", "Ctrl+Alt++"),
+            ("O-", self.app.increase_transparency, '#88ccff', "Decrease Transparency", "Alt+-"),
+            ("O+", self.app.decrease_transparency, '#88ccff', "Increase Transparency", "Alt++"),
+            ("New", self.app.new_note, '#ffff00', "New Note (with Template)", "Ctrl+Alt+N"),
+            ("Open", self.app.open_note, '#00ffff', "Open Note in New Tab", "Ctrl+Alt+O"),
+            ("⚙", self.app.open_settings, '#cccccc', "Settings", None)
         ]
         
         for button_data in buttons:

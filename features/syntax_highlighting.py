@@ -9,15 +9,27 @@ import tkinter as tk
 class SyntaxHighlighter:
     """Handles syntax highlighting for the text editor"""
     
-    def __init__(self, text_widget, settings, theme_manager=None):
+    def __init__(self, text_widget=None, settings=None, theme_manager=None):
         self.text_widget = text_widget
         self.settings = settings
         self.theme_manager = theme_manager
-        self.setup_tags()
+        
+        # Only setup tags if we have a text widget
+        if self.text_widget:
+            self.setup_tags()
+    
+    def set_text_widget(self, text_widget):
+        """Set or change the text widget for highlighting"""
+        self.text_widget = text_widget
+        if self.text_widget:
+            self.setup_tags()
     
     def setup_tags(self):
         """Setup syntax highlighting tags"""
-        font_size = self.settings.get('font_size', 12)
+        if not self.text_widget:
+            return
+            
+        font_size = self.settings.get('font_size', 12) if self.settings else 12
         
         # Code blocks
         self.text_widget.tag_configure("code_block", 
@@ -88,6 +100,9 @@ class SyntaxHighlighter:
     
     def apply_highlighting(self):
         """Apply syntax highlighting to the entire text"""
+        if not self.text_widget:
+            return
+            
         content = self.text_widget.get(1.0, tk.END)
         
         # Clear existing tags
@@ -104,6 +119,9 @@ class SyntaxHighlighter:
     
     def _highlight_markdown(self, content):
         """Highlight markdown elements"""
+        if not self.text_widget:
+            return
+            
         # Headers
         header_pattern = r'^#+\s.*'
         for match in re.finditer(header_pattern, content, re.MULTILINE):
@@ -134,6 +152,9 @@ class SyntaxHighlighter:
     
     def _highlight_code_blocks(self, content):
         """Highlight code blocks"""
+        if not self.text_widget:
+            return
+            
         code_pattern = r'```(\w+)?\n(.*?)\n```'
         for match in re.finditer(code_pattern, content, re.DOTALL):
             start_pos = f"1.0+{match.start()}c"
@@ -142,6 +163,9 @@ class SyntaxHighlighter:
     
     def _highlight_file_paths(self, content):
         """Highlight file paths and directories"""
+        if not self.text_widget:
+            return
+            
         # File patterns
         file_patterns = [
             r'[A-Za-z]:\\(?:[^\\/:*?"<>|\n]+\\)*[^\\/:*?"<>|\n]*\.[A-Za-z0-9]+',
@@ -158,6 +182,9 @@ class SyntaxHighlighter:
     
     def _highlight_urls(self, content):
         """Highlight URLs"""
+        if not self.text_widget:
+            return
+            
         url_pattern = r'https?://[^\s\n]+'
         for match in re.finditer(url_pattern, content):
             start_pos = f"1.0+{match.start()}c"
@@ -166,6 +193,9 @@ class SyntaxHighlighter:
     
     def _highlight_special_keywords(self, content):
         """Highlight special keywords"""
+        if not self.text_widget:
+            return
+            
         special_patterns = {
             'todo': r'\b(?:TODO|FIXME|HACK|BUG)\b[^\n]*',
             'important': r'\b(?:IMPORTANT|CRITICAL|WARNING|ERROR)\b[^\n]*',
@@ -180,7 +210,8 @@ class SyntaxHighlighter:
     
     def update_font_size(self, font_size):
         """Update font size for all tags"""
-        self.settings.set('font_size', font_size)
+        if self.settings:
+            self.settings.set('font_size', font_size)
         self.setup_tags()
         self.apply_highlighting()
     

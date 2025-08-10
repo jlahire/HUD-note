@@ -13,14 +13,17 @@ from ui.components import StatusBar, HUDInterface, ScreenBorder
 from ui.themes import ThemeManager
 from features.syntax_highlighting import SyntaxHighlighter
 from utils.file_operations import FileManager
+from ui.tab_manager import TabManager
 
 
 class OverlayWindow:
     """Main overlay window class with full theme integration"""
     
+    
     def __init__(self, app):
         self.app = app
         self.root = None
+        self.tab_manager = None
         self.text_area = None
         self.status_bar = None
         self.syntax_highlighter = None
@@ -74,9 +77,9 @@ class OverlayWindow:
         # Initialize file manager
         self.file_manager = FileManager(self.app.notes_dir, self.app.settings)
         
-        # Initialize syntax highlighter with theme support
+        # Initialize syntax highlighter without a specific text widget
         self.syntax_highlighter = SyntaxHighlighter(
-            self.text_area, 
+            None,  # No text widget initially
             self.app.settings,
             self.theme_manager
         )
@@ -110,46 +113,14 @@ class OverlayWindow:
         )
     
     def _create_text_area(self):
-        """Create the main text editing area with theme integration"""
+        """Create the main text editing area with tab management"""
         # Create editor frame with themed background
         editor_frame = tk.Frame(self.root)
         self.theme_manager.get_current_theme().apply_to_widget(editor_frame, 'frame')
         editor_frame.pack(fill=tk.BOTH, expand=True, padx=2, pady=2)
         
-        # Create text area with theme colors
-        self.text_area = ScrolledText(
-            editor_frame,
-            wrap=tk.WORD,
-            font=('Consolas', self.app.settings.get('font_size', 12)),
-            relief=tk.FLAT,
-            borderwidth=1,
-            highlightthickness=1,
-            highlightbackground='#333333',
-            undo=True,
-            maxundo=50
-        )
-        
-        # Apply theme to text area
-        self.theme_manager.apply_theme_to_text_widget(self.text_area)
-        
-        # Set highlight color from theme
-        current_theme = self.theme_manager.get_current_theme()
-        if current_theme:
-            self.text_area.configure(
-                highlightcolor=current_theme.get_color('accent_color', '#ff6600')
-            )
-        
-        self.text_area.pack(fill=tk.BOTH, expand=True)
-        
-        # Setup text area shortcuts
-        self.app.hotkey_manager.setup_text_area_shortcuts(self.text_area)
-
-        # Reset cursor when entering text area
-        self.text_area.bind('<Enter>', lambda e: self.app.window_manager.reset_cursor())
-        
-        # Bind text change events
-        self.text_area.bind('<KeyRelease>', self._on_text_change_with_highlighting)
-        self.text_area.bind('<Button-1>', self._on_text_change)
+        # Create tab manager instead of single text area
+        self.tab_manager = TabManager(editor_frame, self.app, self.theme_manager)
     
     def _bind_events(self):
         """Bind window events"""
@@ -159,13 +130,19 @@ class OverlayWindow:
         self.root.protocol("WM_DELETE_WINDOW", self.app.shutdown)
     
     def _load_startup_content(self):
-        """Load startup content into text area"""
+        """Load startup content into first tab"""
         content = self.app.get_template_overview_content()
-        self.text_area.delete(1.0, tk.END)
-        self.text_area.insert(1.0, content)
         
-        if self.syntax_highlighter:
-            self.syntax_highlighter.apply_highlighting()
+        if self.tab_manager:
+            # Replace content of first tab
+            active_tab = self.tab_manager.get_active_tab()
+            if active_tab and active_tab.text_widget:
+                active_tab.text_widget.delete(1.0, tk.END)
+                active_tab.text_widget.insert(1.0, content)
+                
+                if self.syntax_highlighter:
+                    self.syntax_highlighter.set_text_widget(active_tab.text_widget)
+                    self.syntax_highlighter.apply_highlighting()
         
         self.update_file_label()
         self.update_status("Template overview loaded")
@@ -175,7 +152,13 @@ class OverlayWindow:
         self.root.deiconify()
         self.root.lift()
         self.root.focus_force()
-        self.text_area.focus()
+        
+        # Focus active tab instead of self.text_area
+        if self.tab_manager:
+            active_text = self.tab_manager.get_active_text_widget()
+            if active_text:
+                active_text.focus()
+        
         self.update_status("HUD Activated")
     
     def hide(self):
@@ -186,18 +169,6 @@ class OverlayWindow:
     
     def new_note(self):
         """Create a new note with template selection"""
-        # Check if current content needs saving
-        current_content = self.text_area.get(1.0, tk.END).strip()
-        if current_content:
-            save_response = messagebox.askyesnocancel("New Note", 
-                                                    "Save current note before creating new one?")
-            if save_response is True:  # User clicked Yes
-                self.save_note()
-            elif save_response is None:  # User clicked Cancel
-                self.update_status("New note cancelled")
-                return  # Exit without creating new note
-            # If save_response is False (No), continue without saving
-        
         # Show template selection dialog with theme support
         dialog = TemplateSelectionDialog(
             self.root, 
@@ -215,32 +186,26 @@ class OverlayWindow:
             return
         
         if result['action'] == 'template':
-            # Insert template content
-            self.text_area.delete(1.0, tk.END)
-            self.text_area.insert(1.0, result['content'])
-            
-            # Auto-save with title as filename
-            safe_filename = "".join(c for c in self.app.note_title 
-                                if c.isalnum() or c in (' ', '-', '_')).rstrip()
-            file_path = os.path.join(self.app.notes_dir, f"{safe_filename}.md")
-            self.app.set_current_file(file_path)
-            self.save_note()
-            
+            # Create new tab with template content
+            tab_id = self.tab_manager.create_new_tab(content=result['content'])
             self.update_status(f"Created note with {result['template_name']} template")
             
         elif result['action'] == 'blank':
-            # Create blank note
-            self.text_area.delete(1.0, tk.END)
-            self.app.set_current_file(None)
+            # Create new blank tab
+            tab_id = self.tab_manager.create_new_tab()
             self.update_status("Created blank note")
         
         # Update UI
         self.update_file_label()
         if self.syntax_highlighter:
-            self.syntax_highlighter.apply_highlighting()
+            # Apply highlighting to new tab
+            active_text = self.tab_manager.get_active_text_widget()
+            if active_text:
+                self.syntax_highlighter.set_text_widget(active_text)
+                self.syntax_highlighter.apply_highlighting()
     
     def open_note(self):
-        """Open an existing note"""
+        """Open an existing note in new tab"""
         filename = filedialog.askopenfilename(
             initialdir=self.app.notes_dir,
             title="Open Note",
@@ -248,30 +213,25 @@ class OverlayWindow:
         )
         
         if filename:
-            content = self.file_manager.read_file(filename)
-            if content is not None:
-                self.text_area.delete(1.0, tk.END)
-                self.text_area.insert(1.0, content)
-                self.app.set_current_file(filename)
-                self.update_file_label()
-                self.update_status(f"Opened: {os.path.basename(filename)}")
-                
-                if self.syntax_highlighter:
+            self.tab_manager.open_file_in_new_tab(filename)
+            self.update_file_label()
+            self.update_status(f"Opened: {os.path.basename(filename)}")
+            
+            if self.syntax_highlighter:
+                # Apply highlighting to new tab
+                active_text = self.tab_manager.get_active_text_widget()
+                if active_text:
+                    self.syntax_highlighter.set_text_widget(active_text)
                     self.syntax_highlighter.apply_highlighting()
     
     def save_note(self):
-        """Save current note"""
-        current_file = self.app.get_current_file()
-        if not current_file:
-            self.save_as_note()
-            return
-        
-        content = self.text_area.get(1.0, tk.END)
-        if self.file_manager.write_file(current_file, content):
-            self.update_file_label()
-            self.update_status(f"Saved: {os.path.basename(current_file)}")
-        else:
-            messagebox.showerror("Error", f"Could not save file: {current_file}")
+        """Save current tab"""
+        if self.tab_manager.save_active_tab():
+            active_tab = self.tab_manager.get_active_tab()
+            if active_tab and active_tab.file_path:
+                self.app.set_current_file(active_tab.file_path)
+                self.update_file_label()
+                self.update_status(f"Saved: {os.path.basename(active_tab.file_path)}")
     
     def save_as_note(self):
         """Save note with new filename"""
@@ -292,24 +252,28 @@ class OverlayWindow:
         result = dialog.show()
         
         if result:
-            cursor_pos = self.text_area.index(tk.INSERT)
-            self.text_area.insert(cursor_pos, result)
-            self.update_status("Inserted code block")
-            
-            if self.syntax_highlighter:
-                self.syntax_highlighter.apply_highlighting()
+            # Get active text widget instead of self.text_area
+            active_text = self.tab_manager.get_active_text_widget()
+            if active_text:
+                cursor_pos = active_text.index(tk.INSERT)
+                active_text.insert(cursor_pos, result)
+                self.update_status("Inserted code block")
+                
+                if self.syntax_highlighter:
+                    self.syntax_highlighter.set_text_widget(active_text)
+                    self.syntax_highlighter.apply_highlighting()
     
     def toggle_preview(self):
         """Toggle markdown preview with theme support"""
         if hasattr(self, 'preview_frame') and self.preview_frame and self.preview_frame.winfo_viewable():
             self.preview_frame.pack_forget()
-            self.text_area.pack(fill=tk.BOTH, expand=True)
+            # No need to repack text_area since we're using tabs
             self.update_status("Preview hidden")
         else:
             if not hasattr(self, 'preview_frame') or not self.preview_frame:
                 self._create_preview()
             
-            self.text_area.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+            # Show preview alongside tab manager
             self.preview_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
             
             self._update_preview()
@@ -344,18 +308,21 @@ class OverlayWindow:
         if hasattr(self, 'preview_area') and self.preview_area and self.preview_frame.winfo_viewable():
             try:
                 import markdown2
-                content = self.text_area.get(1.0, tk.END)
-                html = markdown2.markdown(content, extras=['fenced-code-blocks', 'tables'])
-                
-                import re
-                text = re.sub(r'<[^>]+>', '', html)
-                text = text.replace('&lt;', '<').replace('&gt;', '>').replace('&amp;', '&')
-                
-                self.preview_area.config(state=tk.NORMAL)
-                self.preview_area.delete(1.0, tk.END)
-                self.preview_area.insert(1.0, text)
-                self.preview_area.config(state=tk.DISABLED)
-                
+                # Get content from active tab instead of self.text_area
+                active_text = self.tab_manager.get_active_text_widget()
+                if active_text:
+                    content = active_text.get(1.0, tk.END)
+                    html = markdown2.markdown(content, extras=['fenced-code-blocks', 'tables'])
+                    
+                    import re
+                    text = re.sub(r'<[^>]+>', '', html)
+                    text = text.replace('&lt;', '<').replace('&gt;', '>').replace('&amp;', '&')
+                    
+                    self.preview_area.config(state=tk.NORMAL)
+                    self.preview_area.delete(1.0, tk.END)
+                    self.preview_area.insert(1.0, text)
+                    self.preview_area.config(state=tk.DISABLED)
+                    
             except Exception as e:
                 print(f"Preview update error: {e}")
     
@@ -392,9 +359,11 @@ class OverlayWindow:
         self.update_status(f"Font size: {new_size}")
     
     def _update_fonts(self):
-        """Update font sizes"""
+        """Update font sizes for all tabs"""
         font_size = self.app.settings.get('font_size', 12)
-        self.text_area.config(font=('Consolas', font_size))
+        if self.tab_manager:
+            self.tab_manager.update_font_size(font_size)
+        
         if hasattr(self, 'preview_area') and self.preview_area:
             self.preview_area.config(font=('Arial', font_size))
         
@@ -429,13 +398,20 @@ class OverlayWindow:
         """Update file label display"""
         if self.hud_interface:
             position_info = self.app.window_manager.get_window_position_info()
-            current_file = self.app.get_current_file()
             
-            if current_file:
-                filename = os.path.basename(current_file)
-                self.hud_interface.update_file_label(f"{filename} [{position_info}]")
+            if self.tab_manager:
+                active_tab = self.tab_manager.get_active_tab()
+                if active_tab:
+                    if active_tab.file_path:
+                        filename = os.path.basename(active_tab.file_path)
+                        self.hud_interface.update_file_label(f"{filename} [{position_info}]")
+                    else:
+                        self.hud_interface.update_file_label(f"{active_tab.title} [{position_info}]")
+                else:
+                    self.hud_interface.update_file_label(f"No tabs open [{position_info}]")
             else:
-                self.hud_interface.update_file_label(f"UNSAVED [{position_info}]")
+                self.hud_interface.update_file_label(f"Loading... [{position_info}]")
+
     
     def update_status(self, message: str):
         """Update status message"""
@@ -443,21 +419,27 @@ class OverlayWindow:
             self.status_bar.update_status(message)
     
     def auto_save(self):
-        """Auto-save the current file"""
-        current_file = self.app.get_current_file()
-        if current_file:
-            content = self.text_area.get(1.0, tk.END)
-            if self.file_manager.write_file(current_file, content):
-                self.update_status("Auto-saved")
+        """Auto-save the current tab"""
+        if self.tab_manager:
+            active_tab = self.tab_manager.get_active_tab()
+            if active_tab and active_tab.file_path and active_tab.text_widget:
+                # Update tab content from text widget
+                active_tab.content = active_tab.text_widget.get(1.0, tk.END)
+                # Save the tab
+                if self.tab_manager._save_tab(active_tab):
+                    self.update_status("Auto-saved")
     
     def _on_text_change(self, event=None):
         """Handle text changes"""
         if hasattr(self, '_save_timer'):
             self.root.after_cancel(self._save_timer)
         
-        current_file = self.app.get_current_file()
-        if current_file:
-            self._save_timer = self.root.after(2000, self.auto_save)
+        # The tab manager handles auto-saving individual tabs
+        if self.tab_manager:
+            active_tab = self.tab_manager.get_active_tab()
+            if active_tab and active_tab.file_path:
+                self._save_timer = self.root.after(2000, self.auto_save)
+
     
     def _on_text_change_with_highlighting(self, event=None):
         """Handle text changes with syntax highlighting"""
@@ -467,12 +449,17 @@ class OverlayWindow:
             if hasattr(self, '_highlight_timer'):
                 self.root.after_cancel(self._highlight_timer)
             
-            self._highlight_timer = self.root.after(300, 
-                                                   self.syntax_highlighter.apply_highlighting)
+            # Update syntax highlighter to use active tab
+            active_text = self.tab_manager.get_active_text_widget()
+            if active_text:
+                self.syntax_highlighter.set_text_widget(active_text)
+                self._highlight_timer = self.root.after(300, 
+                                                    self.syntax_highlighter.apply_highlighting)
         
         # Update preview if visible
         if hasattr(self, 'preview_frame') and self.preview_frame and self.preview_frame.winfo_viewable():
             self._update_preview()
+
     
     def _on_focus_in(self, event):
         """Handle focus in"""
@@ -489,8 +476,9 @@ class OverlayWindow:
         # Apply theme to main window
         self.theme_manager.apply_theme_to_window(self.root, "main")
         
-        # Apply theme to text area
-        self.theme_manager.apply_theme_to_text_widget(self.text_area)
+        # Apply theme to all tabs
+        if self.tab_manager:
+            self.tab_manager.apply_theme(self.theme_manager)
         
         # Update preview area if it exists
         if hasattr(self, 'preview_area') and self.preview_area:
@@ -511,11 +499,15 @@ class OverlayWindow:
         # Update syntax highlighter with new theme colors
         if self.syntax_highlighter:
             self.syntax_highlighter.update_theme(self.theme_manager)
-            self.syntax_highlighter.apply_highlighting()
+            active_text = self.tab_manager.get_active_text_widget()
+            if active_text:
+                self.syntax_highlighter.set_text_widget(active_text)
+                self.syntax_highlighter.apply_highlighting()
         
         # Update screen border colors
         if self.screen_border:
             self.screen_border.update_theme(self.theme_manager)
+
     
     def run(self):
         """Start the overlay main loop"""
@@ -528,6 +520,9 @@ class OverlayWindow:
         """Clean up resources"""
         if self.screen_border:
             self.screen_border.cleanup()
+        
+        if self.tab_manager:
+            self.tab_manager.cleanup()
         
         if self.root:
             try:
