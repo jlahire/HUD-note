@@ -9,7 +9,7 @@ import os
 from datetime import datetime
 
 from ui.dialogs import TemplateSelectionDialog, SettingsDialog, CodeInputDialog
-from ui.components import StatusBar, HUDInterface, ScreenBorder, HotkeyDisplay
+from ui.components import StatusBar, HUDInterface, ScreenBorder
 from ui.themes import ThemeManager
 from features.syntax_highlighting import SyntaxHighlighter
 from utils.file_operations import FileManager
@@ -32,7 +32,6 @@ class OverlayWindow:
         # UI components  
         self.hud_interface = None
         self.screen_border = None
-        self.hotkey_display = None
         
         # State
         self.preview_frame = None
@@ -94,13 +93,6 @@ class OverlayWindow:
         """Create all UI components with theme support"""
         # Create screen border (always visible)
         self.screen_border = ScreenBorder(self.app.display_manager, self.theme_manager)
-        
-        # Create persistent hotkey display
-        self.hotkey_display = HotkeyDisplay(
-            self.app.display_manager, 
-            self.app.hotkey_manager,
-            self.theme_manager
-        )
         
         # Create main HUD interface
         self.hud_interface = HUDInterface(self.root, self.app, self.theme_manager)
@@ -524,10 +516,6 @@ class OverlayWindow:
         # Update screen border colors
         if self.screen_border:
             self.screen_border.update_theme(self.theme_manager)
-        
-        # Update hotkey display colors
-        if self.hotkey_display:
-            self.hotkey_display.update_theme(self.theme_manager)
     
     def run(self):
         """Start the overlay main loop"""
@@ -540,9 +528,6 @@ class OverlayWindow:
         """Clean up resources"""
         if self.screen_border:
             self.screen_border.cleanup()
-        
-        if self.hotkey_display:
-            self.hotkey_display.cleanup()
         
         if self.root:
             try:

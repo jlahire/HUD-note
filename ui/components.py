@@ -202,19 +202,12 @@ class HUDInterface:
         
         # Button configurations
         buttons = [
-            ("A-", self.app.decrease_font, '#ffcc00', "Decrease Font Size", "Ctrl+Alt+-"),
-            ("A+", self.app.increase_font, '#ffcc00', "Increase Font Size", "Ctrl+Alt++"),
-            ("α-", self.app.increase_transparency, '#88ccff', "Decrease Transparency", "Alt+-"),
-            ("α+", self.app.decrease_transparency, '#88ccff', "Increase Transparency", "Alt++"),
-            ("</>", self.app.open_code_window, '#00ccff', "Code Input Window", "Ctrl+Alt+C"),
-            ("●", self.app.new_note, '#ffff00', "New Note (with Template)", "Ctrl+Alt+N"),
-            ("▲", self.app.open_note, '#00ffff', "Open Note", "Ctrl+Alt+O"),
-            ("■", self.app.save_note, '#00ff00', "Save Note", "Ctrl+Alt+S"),
-            ("▫", self.app.save_as_note, '#00cc00', "Save As...", "Ctrl+Alt+Shift+S"),
-            ("◊", self.app.toggle_preview, '#ff00ff', "Toggle Preview", "Ctrl+Alt+P"),
-            ("↻", self.app.reset_position, '#ffaa00', "Reset Window Position", "Ctrl+Alt+R"),
-            ("⚙", self.app.open_settings, '#cccccc', "Settings", None),
-            ("✕", self.app.hide_overlay, '#ff0000', "Hide Overlay", "Esc")
+        ("T-", self.app.decrease_font, '#ffcc00', "Decrease Font Size", "Ctrl+Alt+-"),
+        ("T+", self.app.increase_font, '#ffcc00', "Increase Font Size", "Ctrl+Alt++"),
+        ("O-", self.app.increase_transparency, '#88ccff', "Decrease Transparency", "Alt+-"),
+        ("O+", self.app.decrease_transparency, '#88ccff', "Increase Transparency", "Alt++"),
+        ("New", self.app.new_note, '#ffff00', "New Note (with Template)", "Ctrl+Alt+N"),
+        ("⚙", self.app.open_settings, '#cccccc', "Settings", None)
         ]
         
         for button_data in buttons:
@@ -338,93 +331,6 @@ class ScreenBorder:
                 border.destroy()
             except:
                 pass
-
-
-class HotkeyDisplay:
-    """Persistent hotkey display at bottom of screen"""
-    
-    def __init__(self, display_manager, hotkey_manager, theme_manager=None):
-        self.display_manager = display_manager
-        self.hotkey_manager = hotkey_manager
-        self.theme_manager = theme_manager
-        self.hotkey_window = None
-        self.border_window = None
-        self._create_display()
-    
-    def _create_display(self):
-        """Create hotkey display window with platform-aware transparency"""
-        hotkey_dims = self.display_manager.get_hotkey_bar_dimensions()
-        
-        # Safety check for None return
-        if not hotkey_dims:
-            print("Warning: Could not get hotkey bar dimensions, using defaults")
-            hotkey_dims = {
-                'width': 1920,
-                'height': 30,
-                'y_position': 1050,
-                'font_size': 9
-            }
-        
-        self.hotkey_window = tk.Toplevel()
-        self.hotkey_window.geometry(f"{hotkey_dims['width']}x{hotkey_dims['height']}+0+{hotkey_dims['y_position']}")
-        
-        self.hotkey_window.configure(bg='black')
-        self.hotkey_window.overrideredirect(True)
-        self.hotkey_window.attributes('-topmost', True)
-        PlatformManager.apply_transparency(self.hotkey_window, 0.8)
-        
-        # Get hotkey text
-        hotkeys_text = self.hotkey_manager.create_hotkey_display_text()
-        
-        # Get colors from theme if available
-        if self.theme_manager:
-            current_theme = self.theme_manager.get_current_theme()
-            fg_color = current_theme.get_color('fg_color', '#00ff41') if current_theme else '#00ff41'
-            border_color = current_theme.get_color('border_color', '#00ff41') if current_theme else '#00ff41'
-        else:
-            fg_color = '#00ff41'
-            border_color = '#00ff41'
-        
-        hotkey_label = tk.Label(
-            self.hotkey_window,
-            text=hotkeys_text,
-            bg='black',
-            fg=fg_color,
-            font=('Consolas', hotkey_dims['font_size'], 'bold'),
-            pady=5
-        )
-        hotkey_label.pack(fill=tk.BOTH, expand=True)
-        
-        # Add border line
-        border_height = max(1, int(1 * self.display_manager.dpi_scale))
-        self.border_window = tk.Toplevel()
-        self.border_window.geometry(f"{hotkey_dims['width']}x{border_height}+0+{hotkey_dims['y_position']-border_height}")
-        self.border_window.configure(bg=border_color)
-        self.border_window.overrideredirect(True)
-        self.border_window.attributes('-topmost', True)
-        self.border_window.attributes('-alpha', 0.4)
-    
-    def update_theme(self, theme_manager):
-        """Update hotkey display colors when theme changes"""
-        self.theme_manager = theme_manager
-        # For hotkey display updates, we'd need to recreate the display
-        # This is a simplified version - full implementation would recreate the display
-        pass
-    
-    def cleanup(self):
-        """Clean up hotkey display"""
-        if self.hotkey_window:
-            try:
-                self.hotkey_window.destroy()
-            except:
-                pass
-        
-        if self.border_window:
-            try:
-                self.border_window.destroy()
-            except:
-                pass
-
 
 class ContextMenu:
     """Context menu for text area"""

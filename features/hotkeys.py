@@ -227,36 +227,6 @@ class HotkeyManager:
             print(f"Error executing text area action: {e}")
         return "break"
     
-    def create_hotkey_display_text(self) -> str:
-        """Create hotkey display text for the bottom bar"""
-        hotkeys = self.app.settings.get('hotkeys', {})
-        
-        # Create simplified hotkey display
-        key_display = []
-        
-        # Main hotkeys
-        if 'toggle_overlay' in hotkeys:
-            key_display.append(f"{hotkeys['toggle_overlay']}=Toggle")
-        
-        key_display.extend([
-            "Drag=Move",
-            f"{hotkeys.get('new_note', 'Ctrl+Alt+N')}=New",
-            f"{hotkeys.get('open_note', 'Ctrl+Alt+O')}=Open",
-            f"{hotkeys.get('save_note', 'Ctrl+Alt+S')}=Save",
-            f"{hotkeys.get('toggle_preview', 'Ctrl+Alt+P')}=Preview",
-            "Ctrl+Alt++=Font+",
-            "Ctrl+Alt+-=Font-",
-            f"{hotkeys.get('code_window', 'Ctrl+Alt+C')}=Code",
-            f"{hotkeys.get('move_corner_1', 'Ctrl+Alt+1-4')}=Corners",
-            f"{hotkeys.get('center_window', 'Ctrl+Alt+5')}=Center",
-            f"{hotkeys.get('reset_position', 'Ctrl+Alt+M')}=NextDisplay",
-            "Esc=Hide",
-            "Ctrl+Alt+Q=Exit",
-            f"{hotkeys.get('reset_position', 'Ctrl+Alt+R')}=Reset"
-        ])
-        
-        return "HOTKEYS: " + " | ".join(key_display)
-    
     def update_hotkeys(self, new_hotkeys: Dict[str, str]):
         """Update hotkey configuration"""
         # Stop current listener

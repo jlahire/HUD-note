@@ -2,273 +2,257 @@
 Template management system for HUD Notes
 """
 
-import os
-import glob
 from typing import Dict, List
 
 
 class TemplateManager:
-    """Manages note templates from the templates directory"""
+    """Manages note templates from hardcoded definitions"""
     
-    def __init__(self, templates_dir: str):
+    def __init__(self, templates_dir: str = None):
+        # Keep templates_dir for compatibility but don't use it
         self.templates_dir = templates_dir
         self.templates = {}
         self.load_templates()
     
     def load_templates(self):
-        """Load all template files from templates directory"""
-        if not os.path.exists(self.templates_dir):
-            os.makedirs(self.templates_dir, exist_ok=True)
-            self.create_default_templates()
+        """Load hardcoded templates"""
+        print("DEBUG: Loading hardcoded templates...")
         
-        # Load all .md files from templates directory
-        template_files = glob.glob(os.path.join(self.templates_dir, "*.md"))
-        
-        for template_file in template_files:
-            template_name = os.path.splitext(os.path.basename(template_file))[0]
-            try:
-                with open(template_file, 'r', encoding='utf-8') as f:
-                    content = f.read()
-                self.templates[template_name.replace('_', ' ').title()] = content
-            except Exception as e:
-                print(f"Warning: Could not load template {template_file}: {e}")
-        
-        # Fallback to basic template if no templates loaded
-        if not self.templates:
-            self.templates["Basic"] = "# {title}\n\n**Author:** {author}\n**Date:** {date}\n\n---\n\n"
-    
-    def create_default_templates(self):
-        """Create default template files if templates directory is empty"""
-        default_templates = {
-            "basic.md": "# {title}\n\n**Author:** {author}\n**Date:** {date}\n\n---\n\n",
-            "meeting.md": """# {title}
+        self.templates = {
+            "Basic": "# {title}\n\n**Author:** {author}\n**Date:** {date}\n\n---\n\n",
+            
+            "Meeting": """# {title}
 
-            **Date:** {date}
-            **Attendees:** 
-            **Agenda:**
+**Date:** {date}
+**Attendees:** 
+**Agenda:**
 
-            ---
+---
 
-            ## Notes
+## Notes
 
-            ## Action Items
-            - [ ] 
+## Action Items
+- [ ] 
 
-            """,
-                        "daily_log.md": """# {title}
+""",
+            
+            "Daily Log": """# {title}
 
-            **Date:** {date}
+**Date:** {date}
 
-            ---
+---
 
-            ## Today's Goals
-            - [ ] 
+## Today's Goals
+- [ ] 
 
-            ## Completed
+## Completed
 
-            ## Notes
+## Notes
 
-            ## Tomorrow
-            - [ ] 
+## Tomorrow
+- [ ] 
 
-            """,
-                        "code_review.md": """# {title}
+""",
+            
+            "Code Review": """# {title}
 
-            **Author:** {author}
-            **Date:** {date}
-            **Repository:** 
-            **Branch:** 
+**Author:** {author}
+**Date:** {date}
+**Repository:** 
+**Branch:** 
 
-            ---
+---
 
-            ## Changes
+## Changes
 
-            ## Issues Found
+## Issues Found
 
-            ## Recommendations
+## Recommendations
 
-            """,
-                        "ctf_writeup.md": """# {title}
+""",
+            
+            "Ctf Writeup": """# {title}
 
-            **Author:** {author}
-            **Date:** {date}
-            **Challenge:** 
-            **Category:** 
-            **Points:** 
+**Author:** {author}
+**Date:** {date}
+**Challenge:** 
+**Category:** 
+**Points:** 
 
-            ---
+---
 
-            ## Challenge Description
+## Challenge Description
 
-            ## Solution
+## Solution
 
-            ### Reconnaissance
+### Reconnaissance
 
-            ### Exploitation
+### Exploitation
 
-            ### Flag
+### Flag
 
-            ```
-            [FLAG_HERE]
-            ```
+```
+[FLAG_HERE]
+```
 
-            ## Lessons Learned
+## Lessons Learned
 
-            """,
-                        "class_notes.md": """# {title}
+""",
+            
+            "Class Notes": """# {title}
 
-            **Date:** {date}
-            **Course:** 
-            **Professor:** 
-            **Topic:** 
+**Date:** {date}
+**Course:** 
+**Professor:** 
+**Topic:** 
 
-            ---
+---
 
-            ## Key Concepts
+## Key Concepts
 
-            ## Notes
+## Notes
 
-            ## Important Formulas/Code
+## Important Formulas/Code
 
-            ## Questions/Clarifications
+## Questions/Clarifications
 
-            ## Action Items
-            - [ ] 
+## Action Items
+- [ ] 
 
-            """,
-                        "study_session.md": """# {title}
+""",
+            
+            "Study Session": """# {title}
 
-            **Date:** {date}
-            **Subject:** 
-            **Duration:** 
-            **Goal:** 
+**Date:** {date}
+**Subject:** 
+**Duration:** 
+**Goal:** 
 
-            ---
+---
 
-            ## Topics Covered
+## Topics Covered
 
-            ## What I Learned
+## What I Learned
 
-            ## Still Need to Review
+## Still Need to Review
 
-            ## Next Session Plan
+## Next Session Plan
 
-            """,
-                        "project_planning.md": """# {title}
+""",
+            
+            "Project Planning": """# {title}
 
-            **Author:** {author}
-            **Date:** {date}
-            **Project:** 
-            **Deadline:** 
+**Author:** {author}
+**Date:** {date}
+**Project:** 
+**Deadline:** 
 
-            ---
+---
 
-            ## Objectives
+## Objectives
 
-            ## Requirements
+## Requirements
 
-            ## Timeline
+## Timeline
 
-            ## Resources Needed
+## Resources Needed
 
-            ## Risks/Concerns
+## Risks/Concerns
 
-            ## Next Steps
-            - [ ] 
+## Next Steps
+- [ ] 
 
-            """,
-                        "bug_report.md": """# {title}
+""",
+            
+            "Bug Report": """# {title}
 
-            **Author:** {author}
-            **Date:** {date}
-            **Severity:** 
-            **Priority:** 
+**Author:** {author}
+**Date:** {date}
+**Severity:** 
+**Priority:** 
 
-            ---
+---
 
-            ## Description
+## Description
 
-            ## Steps to Reproduce
+## Steps to Reproduce
 
-            1. 
-            2. 
-            3. 
+1. 
+2. 
+3. 
 
-            ## Expected Behavior
+## Expected Behavior
 
-            ## Actual Behavior
+## Actual Behavior
 
-            ## Environment
+## Environment
 
-            ## Additional Notes
+## Additional Notes
 
-            """,
-                        "powershell_script.md": """# {title}
+""",
+            
+            "Powershell Script": """# {title}
 
-            **Author:** {author}
-            **Date:** {date}
-            **Purpose:** 
-            **Requirements:** 
+**Author:** {author}
+**Date:** {date}
+**Purpose:** 
+**Requirements:** 
 
-            ---
+---
 
-            ## Script Overview
+## Script Overview
 
-            ## Parameters
+## Parameters
 
-            ## Usage Examples
+## Usage Examples
 
-            ```powershell
-            # Example usage
-            .\\{title}.ps1 -Parameter "value"
-            ```
+```powershell
+# Example usage
+.\\{title}.ps1 -Parameter "value"
+```
 
-            ## Script Code
+## Script Code
 
-            ```powershell
-            # PowerShell script content here
-            ```
+```powershell
+# PowerShell script content here
+```
 
-            ## Notes
+## Notes
 
-            """,
-                        "batch_script.md": """# {title}
+""",
+            
+            "Batch Script": """# {title}
 
-            **Author:** {author}
-            **Date:** {date}
-            **Purpose:** 
-            **Requirements:** 
+**Author:** {author}
+**Date:** {date}
+**Purpose:** 
+**Requirements:** 
 
-            ---
+---
 
-            ## Script Overview
+## Script Overview
 
-            ## Usage
+## Usage
 
-            ```batch
-            REM Usage example
-            {title}.bat [parameters]
-            ```
+```batch
+REM Usage example
+{title}.bat [parameters]
+```
 
-            ## Script Code
+## Script Code
 
-            ```batch
-            @echo off
-            REM Batch script content here
-            ```
+```batch
+@echo off
+REM Batch script content here
+```
 
-            ## Notes
+## Notes
 
-            """
+"""
         }
         
-        for filename, content in default_templates.items():
-            template_path = os.path.join(self.templates_dir, filename)
-            try:
-                with open(template_path, 'w', encoding='utf-8') as f:
-                    f.write(content)
-            except Exception as e:
-                print(f"Warning: Could not create template {filename}: {e}")
+        print(f"DEBUG: Loaded {len(self.templates)} hardcoded templates")
+        print(f"DEBUG: Template names: {list(self.templates.keys())}")
     
     def get_template_names(self) -> List[str]:
         """Get list of available template names"""
@@ -316,8 +300,7 @@ class TemplateManager:
                 return template_content
     
     def reload_templates(self):
-        """Reload templates from disk"""
-        self.templates.clear()
+        """Reload templates (no-op for hardcoded templates)"""
         self.load_templates()
     
     def create_template_overview(self, author: str) -> str:
@@ -332,29 +315,29 @@ class TemplateManager:
         overview_content += f"**Templates Available:** {len(template_names)}\n\n"
         overview_content += "---\n\n"
         overview_content += "## Quick Start Guide\n\n"
-        overview_content += "• Press **Ctrl+Alt+N** or click **●** for new note with template selection\n"
-        overview_content += "• Press **Ctrl+Alt+O** or click **▲** to open existing note\n"
-        overview_content += "• Press **Ctrl+Alt+S** or click **■** to save current note\n"
-        overview_content += "• Press **Ctrl+Alt+C** or click **</>** for code input window\n"
-        overview_content += "• Press **Ctrl+Alt+G** or click **⚙** for settings\n\n"
+        overview_content += "• Press **Ctrl+Alt+N** or click **New** for new note with template selection\n"
+        overview_content += "• Press **Ctrl+Alt+S** to save current note\n"
+        overview_content += "• Use **T-/T+** buttons for text size adjustment\n"
+        overview_content += "• Use **O-/O+** buttons for transparency adjustment\n"
+        overview_content += "• Click **⚙** for settings and theme customization\n\n"
         overview_content += "---\n\n"
         overview_content += "## Available Templates\n\n"
         
         # Add each template with preview
         for i, template_name in enumerate(sorted(template_names), 1):
             template_content = self.get_template_content(template_name)
-                    
-        # Format the template to show structure
-        try:
-            formatted_template = self.format_template(
-                template_name,
-                title=f"Example {template_name}",
-                author=author or "Your Name",
-                date=datetime.now().strftime('%Y-%m-%d %H:%M')
-            )
-        except Exception as e:
-            print(f"Warning: Could not format template {template_name}: {e}")
-            formatted_template = self.get_template_content(template_name)
+            
+            # Format the template to show structure
+            try:
+                formatted_template = self.format_template(
+                    template_name,
+                    title=f"Example {template_name}",
+                    author=author or "Your Name",
+                    date=datetime.now().strftime('%Y-%m-%d %H:%M')
+                )
+            except Exception as e:
+                print(f"Warning: Could not format template {template_name}: {e}")
+                formatted_template = self.get_template_content(template_name)
             
             overview_content += f"### {i}. {template_name}\n\n"
             overview_content += f"**Description:** {self.get_template_description(template_name)}\n\n"
@@ -371,12 +354,14 @@ class TemplateManager:
         
         # Add footer
         overview_content += "## Getting Started\n\n"
-        overview_content += "1. **Choose a template** by pressing **Ctrl+Alt+N** (New Note)\n"
+        overview_content += "1. **Choose a template** by pressing **Ctrl+Alt+N** or clicking **New**\n"
         overview_content += "2. **Select from the list** of available templates\n"
         overview_content += "3. **Start writing** - your content will auto-save\n"
-        overview_content += "4. **Customize appearance** in Settings (⚙)\n\n"
-        overview_content += "**Tip:** You can create custom templates by adding `.md` files to the `templates/` directory!\n\n"
-        overview_content += f"**Templates Directory:** `{self.templates_dir}`\n\n"
+        overview_content += "4. **Adjust appearance** using the control buttons:\n"
+        overview_content += "   - **T-/T+** - Decrease/increase text size\n"
+        overview_content += "   - **O-/O+** - Decrease/increase transparency\n"
+        overview_content += "   - **⚙** - Open settings for themes and preferences\n\n"
+        overview_content += "**Tip:** Templates are now built into the application for reliability!\n\n"
         overview_content += "---\n\n"
         overview_content += "*Welcome to HUD Notes! This overview will be replaced when you create your first note.*"
         
