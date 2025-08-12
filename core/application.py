@@ -99,11 +99,20 @@ class HUDNotesApp:
         # Initialize hotkey manager BEFORE overlay (so it exists when overlay creates components)
         self.hotkey_manager = HotkeyManager(self)
         
+        # Initialize overlay window LAST (after all dependencies are ready)
+        self.overlay = OverlayWindow(self)      
+          
         # Initialize auto features
         self.auto_features = AutoFeatureManager(self)
         
-        # Initialize overlay window LAST (after all dependencies are ready)
-        self.overlay = OverlayWindow(self)
+        # Make sure queue processors start
+        if hasattr(self.auto_features, '_start_queue_processor'):
+            self.auto_features._start_queue_processor()
+        
+        if hasattr(self.hotkey_manager, '_start_queue_processor'):
+            self.hotkey_manager._start_queue_processor()
+        
+
     
     def toggle_overlay(self):
         """Toggle overlay visibility"""
@@ -230,33 +239,34 @@ class HUDNotesApp:
         return "# HUD Notes\n\nWelcome to HUD Notes!"
     
     def run(self):
-        """Start the application"""
-        if not self.setup_complete:
-            print("Setup not completed. Cannot start application.")
-            return
-        
-        print("🚀 HUD Notes Production Version Started")
-        print(f"  • Notes Directory: {self.notes_dir}")
-        print(f"  • Templates Directory: {self.templates_dir}")
-        print(f"  • Available Templates: {', '.join(self.template_manager.get_template_names())}")
-        
-        display_info = self.display_manager.get_display_info()
-        print(f"  • Display Settings: {display_info['width']}x{display_info['height']} (Scale: {display_info['scale']:.1f}x)")
-        
-        layout = self.display_manager.get_quarter_screen_layout()
-        print(f"  • Window Position: {layout['width']}x{layout['height']} at ({layout['x']}, {layout['y']})")
-        
-        print("  • Press Ctrl+Alt+T to toggle HUD overlay")
-        print("  • Use A-/A+ buttons for font size, α -/+ for transparency")
-        print("  • Right-click in text area for context menu")
-        print("  • Drag from title bar or [DRAG HERE] to move window")
-        print("  • See hotkey bar at bottom of screen for all shortcuts")
-        
-        try:
-            if self.overlay:
-                self.overlay.run()
-        except KeyboardInterrupt:
-            self.shutdown()
+            """Start the application"""
+            if not self.setup_complete:
+                print("Setup not completed. Cannot start application.")
+                return
+            
+            print("🚀 HUD Notes Production Version Started")
+            print(f"  • Notes Directory: {self.notes_dir}")
+            print(f"  • Templates Directory: {self.templates_dir}")
+            print(f"  • Available Templates: {', '.join(self.template_manager.get_template_names())}")
+            
+            display_info = self.display_manager.get_display_info()
+            print(f"  • Display Settings: {display_info['width']}x{display_info['height']} (Scale: {display_info['scale']:.1f}x)")
+            
+            layout = self.display_manager.get_quarter_screen_layout()
+            print(f"  • Window Position: {layout['width']}x{layout['height']} at ({layout['x']}, {layout['y']})")
+            
+            print("  • Press Ctrl+Alt+H to toggle HUD overlay (ONLY global hotkey)")
+            print("  • All other shortcuts work when HUD window has focus")
+            print("  • Use A-/A+ buttons for font size, α -/+ for transparency")
+            print("  • Right-click in text area for context menu")
+            print("  • Drag from title bar or [DRAG HERE] to move window")
+            print("  • See hotkey bar at bottom of screen for all shortcuts")
+            
+            try:
+                if self.overlay:
+                    self.overlay.run()
+            except KeyboardInterrupt:
+                self.shutdown()
     
     def shutdown(self):
         """Clean shutdown of the application"""

@@ -148,24 +148,111 @@ class OverlayWindow:
         self.update_status("Template overview loaded")
     
     def show(self):
-        """Show the overlay"""
-        self.root.deiconify()
-        self.root.lift()
-        self.root.focus_force()
+            """Show the overlay - THREAD SAFE VERSION"""
+            try:
+                if self.root:
+                    try:
+                        self.root.deiconify()
+                        self.root.lift()
+                        self.root.focus_force()
+                        print("DEBUG: Successfully showed overlay window")
+                    except RuntimeError as e:
+                        if "main thread is not in main loop" in str(e):
+                            print("DEBUG: Cannot show window from background thread")
+                            # Schedule the show operation for the main thread
+                            try:
+                                self.root.after(0, self._safe_show)
+                                print("DEBUG: Scheduled window show for main thread")
+                            except Exception as e2:
+                                print(f"DEBUG: Could not schedule show operation: {e2}")
+                                # Last resort - try direct show despite the error
+                                try:
+                                    self.root.deiconify()
+                                    self.root.lift()
+                                    self.root.focus_force()
+                                    print("DEBUG: Direct show succeeded unexpectedly")
+                                except:
+                                    print("DEBUG: All show attempts failed")
+                        else:
+                            print(f"DEBUG: Unexpected show error: {e}")
+                            raise
+                    except Exception as e:
+                        print(f"DEBUG: Error showing overlay: {e}")
+                
+                # Focus active tab instead of self.text_area
+                if self.tab_manager:
+                    active_text = self.tab_manager.get_active_text_widget()
+                    if active_text:
+                        try:
+                            active_text.focus()
+                        except:
+                            print("DEBUG: Could not focus active text widget")
+                
+                self.update_status("HUD Activated")
+            except Exception as e:
+                print(f"DEBUG: Error in show method: {e}")
         
-        # Focus active tab instead of self.text_area
-        if self.tab_manager:
-            active_text = self.tab_manager.get_active_text_widget()
-            if active_text:
-                active_text.focus()
+    def _safe_show(self):
+            """Safely show window in main thread"""
+            try:
+                if self.root:
+                    self.root.deiconify()
+                    self.root.lift() 
+                    self.root.focus_force()
+                    print("DEBUG: Window shown safely in main thread")
+                    
+                    # Focus active tab
+                    if self.tab_manager:
+                        active_text = self.tab_manager.get_active_text_widget()
+                        if active_text:
+                            active_text.focus()
+            except Exception as e:
+                print(f"DEBUG: Error in safe show: {e}")
         
-        self.update_status("HUD Activated")
+            self.update_status("HUD Activated")
     
     def hide(self):
-        """Hide the overlay"""
-        # Save window geometry before hiding
-        self.app.window_manager._save_window_geometry()
-        self.root.withdraw()
+            """Hide the overlay - THREAD SAFE VERSION"""
+            try:
+                # Save window geometry before hiding (now thread-safe)
+                if hasattr(self.app, 'window_manager') and self.app.window_manager:
+                    self.app.window_manager._save_window_geometry()
+                
+                # Try to withdraw the window
+                if self.root:
+                    try:
+                        self.root.withdraw()
+                        print("DEBUG: Successfully hid overlay window")
+                    except RuntimeError as e:
+                        if "main thread is not in main loop" in str(e):
+                            print("DEBUG: Cannot hide window from background thread")
+                            # Schedule the hide operation for the main thread
+                            try:
+                                self.root.after(0, self._safe_withdraw)
+                                print("DEBUG: Scheduled window hide for main thread")
+                            except Exception as e2:
+                                print(f"DEBUG: Could not schedule hide operation: {e2}")
+                                # Last resort - try direct withdraw despite the error
+                                try:
+                                    self.root.withdraw()
+                                except:
+                                    print("DEBUG: All hide attempts failed")
+                        else:
+                            print(f"DEBUG: Unexpected hide error: {e}")
+                            raise
+                    except Exception as e:
+                        print(f"DEBUG: Error hiding overlay: {e}")
+            except Exception as e:
+                print(f"DEBUG: Error in hide method: {e}")
+        
+    def _safe_withdraw(self):
+            """Safely withdraw window in main thread"""
+            try:
+                if self.root:
+                    self.root.withdraw()
+                    print("DEBUG: Window withdrawn safely in main thread")
+            except Exception as e:
+                print(f"DEBUG: Error in safe withdraw: {e}")
     
     def new_note(self):
         """Create a new note with template selection"""

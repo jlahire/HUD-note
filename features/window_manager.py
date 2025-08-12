@@ -215,25 +215,42 @@ class WindowManager:
             self._save_window_geometry()
     
     def _save_window_geometry(self):
-        """Save current window geometry to settings"""
-        if not self.window:
-            return
-        
-        geometry = self.window.geometry()
-        if '+' in geometry:
+            """Save current window geometry to settings - THREAD SAFE VERSION"""
+            if not self.window:
+                return
+            
             try:
-                size, position = geometry.split('+', 1)
-                width, height = size.split('x')
-                x, y = position.split('+')
-                self.settings.update({
-                    'window_width': int(width),
-                    'window_height': int(height),
-                    'window_x': int(x),
-                    'window_y': int(y)
-                })
-                self.settings.save_config()
-            except:
-                pass
+                # Try to get geometry - this might fail if called from wrong thread
+                geometry = self.window.geometry()
+                
+                if '+' in geometry:
+                    try:
+                        size, position = geometry.split('+', 1)
+                        width, height = size.split('x')
+                        x, y = position.split('+')
+                        self.settings.update({
+                            'window_width': int(width),
+                            'window_height': int(height),
+                            'window_x': int(x),
+                            'window_y': int(y)
+                        })
+                        self.settings.save_config()
+                        print(f"DEBUG: Saved geometry: {geometry}")
+                    except Exception as e:
+                        print(f"DEBUG: Error parsing geometry {geometry}: {e}")
+            
+            except RuntimeError as e:
+                if "main thread is not in main loop" in str(e):
+                    print("DEBUG: Cannot save geometry from background thread, skipping")
+                    # Don't try to save geometry if we're in the wrong thread
+                    # This is okay - geometry will be saved next time it's called from main thread
+                    return
+                else:
+                    print(f"DEBUG: Unexpected geometry error: {e}")
+            
+            except Exception as e:
+                print(f"DEBUG: Error saving window geometry: {e}")
+                # Continue execution even if geometry saving fails
     
     def reset_to_quarter_screen(self):
         """Reset window to right 1/4 of current display"""

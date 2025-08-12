@@ -1,14 +1,15 @@
 """
-Global hotkey management for HUD Notes
+Minimal hotkey management - ONLY toggle show/hide - THREAD SAFE VERSION
 """
 
 import threading
 from pynput import keyboard
 from typing import Dict, Callable
+import queue
 
 
 class HotkeyManager:
-    """Manages global hotkeys and keyboard shortcuts"""
+    """Manages only the essential toggle hotkey with thread-safe communication"""
     
     def __init__(self, app):
         self.app = app
@@ -16,88 +17,89 @@ class HotkeyManager:
         self.hotkey_thread = None
         self.running = False
         
-        # Hotkey action mappings
-        self.hotkey_actions = {
-            'toggle_overlay': self.app.toggle_overlay,
-            'new_note': self.app.new_note,
-            'open_note': self.app.open_note,
-            'save_note': self.app.save_note,
-            'save_as': self.app.save_as_note,
-            'code_window': self.app.open_code_window,
-            'toggle_preview': self.app.toggle_preview,
-            'reset_position': self.app.reset_position,
-            'move_corner_1': lambda: self.app.move_to_corner('top-left'),
-            'move_corner_2': lambda: self.app.move_to_corner('top-right'),
-            'move_corner_3': lambda: self.app.move_to_corner('bottom-left'),
-            'move_corner_4': lambda: self.app.move_to_corner('bottom-right'),
-            'center_window': self.app.center_window,
-            'quit_app': self.app.shutdown,  # Added quit functionality
-        }
+        # Thread-safe communication queue
+        self.command_queue = queue.Queue()
         
-        self._setup_hotkeys()
+        # Only one hotkey - toggle overlay
+        self.toggle_hotkey = self.app.settings.get('hotkeys', {}).get('toggle_overlay', 'Ctrl+Alt+H')
+        
+        self._setup_toggle_hotkey()
+        self._start_queue_processor()
     
-    def _setup_hotkeys(self):
-        """Setup global hotkeys"""
+    def _setup_toggle_hotkey(self):
+        """Setup only the toggle hotkey with thread-safe queue communication"""
         def hotkey_listener():
             try:
-                # Get hotkey configuration
-                hotkeys = self.app.settings.get('hotkeys', {})
+                # Convert hotkey string to pynput format
+                pynput_hotkey = self._convert_hotkey_string(self.toggle_hotkey)
                 
-                # Create hotkey mappings
-                hotkey_map = {}
-                for action, hotkey_string in hotkeys.items():
-                    if action in self.hotkey_actions:
-                        # Convert hotkey string to pynput format
-                        pynput_hotkey = self._convert_hotkey_string(hotkey_string)
-                        if pynput_hotkey:
-                            # Wrap the action to ensure it runs in main thread
-                            action_func = self._create_thread_safe_action(self.hotkey_actions[action])
-                            hotkey_map[pynput_hotkey] = action_func
-                
-                # Start global hotkey listener
-                if hotkey_map:
+                if pynput_hotkey:
+                    print(f"DEBUG: Setting up toggle hotkey: {self.toggle_hotkey} -> {pynput_hotkey}")
+                    
+                    # Create simple toggle action that uses queue
+                    def toggle_action():
+                        print(f"DEBUG: Toggle hotkey triggered - queuing command")
+                        try:
+                            # Put command in queue instead of direct GUI access
+                            self.command_queue.put(('toggle_overlay',))
+                        except Exception as e:
+                            print(f"DEBUG: Queue error: {e}")
+                    
+                    # Start global hotkey listener with only toggle
+                    hotkey_map = {pynput_hotkey: toggle_action}
+                    
                     with keyboard.GlobalHotKeys(hotkey_map):
                         self.running = True
                         while self.running:
                             import time
                             time.sleep(0.1)
+                else:
+                    print(f"DEBUG: Could not setup hotkey: {self.toggle_hotkey}")
                         
             except Exception as e:
-                print(f"Hotkey listener error: {e}")
+                print(f"Toggle hotkey listener error: {e}")
                 self.running = False
         
         # Start hotkey listener in separate thread
         self.hotkey_thread = threading.Thread(target=hotkey_listener, daemon=True)
         self.hotkey_thread.start()
     
-    def _create_thread_safe_action(self, action):
-        """Create a thread-safe wrapper for GUI actions"""
-        def safe_action():
+    def _start_queue_processor(self):
+        """Start the queue processor in the main thread"""
+        def process_commands():
+            """Process commands from the queue - runs in main thread"""
             try:
-                # Simple approach: just call the action directly
-                # The action methods should handle their own thread safety
-                action()
+                while True:
+                    try:
+                        command = self.command_queue.get_nowait()
+                        if command[0] == 'toggle_overlay':
+                            print(f"DEBUG: Processing toggle command from queue")
+                            # This runs in main thread, so it's safe
+                            if self.app.overlay_visible:
+                                self.app.hide_overlay()
+                                print("DEBUG: Overlay hidden via queue")
+                            else:
+                                self.app.show_overlay()
+                                print("DEBUG: Overlay shown via queue")
+                    except queue.Empty:
+                        break
             except Exception as e:
-                print(f"Error executing hotkey action: {e}")
-        
-        return safe_action
-
-    def _process_pending_actions(self):
-        """Process any pending actions in the main thread"""
-        if hasattr(self.app, '_pending_actions') and self.app._pending_actions:
-            actions_to_process = self.app._pending_actions.copy()
-            self.app._pending_actions.clear()
+                print(f"DEBUG: Queue processor error: {e}")
             
-            for action in actions_to_process:
+            # Schedule next check
+            if hasattr(self.app, 'overlay') and self.app.overlay and self.app.overlay.root:
                 try:
-                    action()
-                except Exception as e:
-                    print(f"Error processing pending action: {e}")
+                    self.app.overlay.root.after(50, process_commands)  # Check every 50ms
+                except:
+                    pass
+        
+        # Start the processor
+        if hasattr(self.app, 'overlay') and self.app.overlay and self.app.overlay.root:
+            self.app.overlay.root.after(100, process_commands)
     
     def _convert_hotkey_string(self, hotkey_string: str) -> str:
         """Convert hotkey string to pynput format"""
         try:
-            # Handle common hotkey formats
             parts = hotkey_string.lower().split('+')
             
             modifiers = []
@@ -120,22 +122,8 @@ class HotkeyManager:
                     else:
                         # Handle special keys
                         key_mappings = {
-                            'enter': 'enter',
-                            'return': 'enter',
-                            'space': 'space',
-                            'tab': 'tab',
-                            'escape': 'esc',
-                            'esc': 'esc',
-                            'backspace': 'backspace',
-                            'delete': 'delete',
-                            'up': 'up',
-                            'down': 'down',
-                            'left': 'left',
-                            'right': 'right',
-                            'home': 'home',
-                            'end': 'end',
-                            'page_up': 'page_up',
-                            'page_down': 'page_down',
+                            'enter': 'enter', 'return': 'enter', 'space': 'space',
+                            'tab': 'tab', 'escape': 'esc', 'esc': 'esc',
                             'f1': 'f1', 'f2': 'f2', 'f3': 'f3', 'f4': 'f4',
                             'f5': 'f5', 'f6': 'f6', 'f7': 'f7', 'f8': 'f8',
                             'f9': 'f9', 'f10': 'f10', 'f11': 'f11', 'f12': 'f12'
@@ -143,7 +131,6 @@ class HotkeyManager:
                         key = key_mappings.get(part, part)
             
             if key:
-                # Build pynput hotkey string
                 if modifiers:
                     return '+'.join(modifiers) + '+' + key
                 else:
@@ -156,8 +143,10 @@ class HotkeyManager:
             return None
     
     def setup_window_shortcuts(self, window):
-        """Setup window-specific keyboard shortcuts"""
-        # Standard shortcuts that work when window has focus
+        """Setup window-specific keyboard shortcuts - FULL FEATURE SET"""
+        print("DEBUG: Setting up window shortcuts (no global hotkeys)")
+        
+        # All the functionality via window shortcuts (when window has focus)
         shortcuts = {
             '<Control-Alt-n>': lambda e: self.app.new_note(),
             '<Control-Alt-o>': lambda e: self.app.open_note(),
@@ -170,47 +159,36 @@ class HotkeyManager:
             '<Control-Alt-g>': lambda e: self.app.open_settings(),
             '<Control-Alt-r>': lambda e: self.app.reset_position(),
             '<Control-Alt-m>': lambda e: self.app.move_to_next_display(),
-            '<Control-Alt-q>': lambda e: self.app.shutdown(),  # Added quit hotkey
+            '<Control-Alt-q>': lambda e: self.app.shutdown(),
             '<Escape>': lambda e: self.app.hide_overlay(),
-        }
-        
-        # Window positioning shortcuts
-        position_shortcuts = {
-            '<Control-Alt-Key-1>': lambda e: self.app.move_to_corner('top-left'),
+            
+            # Window positioning
             '<Control-Alt-1>': lambda e: self.app.move_to_corner('top-left'),
-            '<Control-Alt-Key-2>': lambda e: self.app.move_to_corner('top-right'),
             '<Control-Alt-2>': lambda e: self.app.move_to_corner('top-right'),
-            '<Control-Alt-Key-3>': lambda e: self.app.move_to_corner('bottom-left'),
             '<Control-Alt-3>': lambda e: self.app.move_to_corner('bottom-left'),
-            '<Control-Alt-Key-4>': lambda e: self.app.move_to_corner('bottom-right'),
             '<Control-Alt-4>': lambda e: self.app.move_to_corner('bottom-right'),
-            '<Control-Alt-Key-5>': lambda e: self.app.center_window(),
             '<Control-Alt-5>': lambda e: self.app.center_window(),
         }
         
-        # Bind all shortcuts
-        all_shortcuts = {**shortcuts, **position_shortcuts}
-        
-        for shortcut, action in all_shortcuts.items():
+        # Bind all shortcuts (these work when window has focus - no threading issues)
+        for shortcut, action in shortcuts.items():
             try:
                 window.bind(shortcut, action)
+                print(f"DEBUG: Bound window shortcut {shortcut}")
             except Exception as e:
                 print(f"Error binding shortcut {shortcut}: {e}")
     
     def setup_text_area_shortcuts(self, text_area):
         """Setup text area specific shortcuts"""
-        # Position shortcuts also work in text area
+        print("DEBUG: Setting up text area shortcuts")
+        
+        # Position shortcuts work in text area too
         position_shortcuts = {
-            '<Control-Alt-Key-1>': lambda e: self._text_area_action(lambda: self.app.move_to_corner('top-left')),
-            '<Control-Alt-1>': lambda e: self._text_area_action(lambda: self.app.move_to_corner('top-left')),
-            '<Control-Alt-Key-2>': lambda e: self._text_area_action(lambda: self.app.move_to_corner('top-right')),
-            '<Control-Alt-2>': lambda e: self._text_area_action(lambda: self.app.move_to_corner('top-right')),
-            '<Control-Alt-Key-3>': lambda e: self._text_area_action(lambda: self.app.move_to_corner('bottom-left')),
-            '<Control-Alt-3>': lambda e: self._text_area_action(lambda: self.app.move_to_corner('bottom-left')),
-            '<Control-Alt-Key-4>': lambda e: self._text_area_action(lambda: self.app.move_to_corner('bottom-right')),
-            '<Control-Alt-4>': lambda e: self._text_area_action(lambda: self.app.move_to_corner('bottom-right')),
-            '<Control-Alt-Key-5>': lambda e: self._text_area_action(lambda: self.app.center_window()),
-            '<Control-Alt-5>': lambda e: self._text_area_action(lambda: self.app.center_window()),
+            '<Control-Alt-1>': lambda e: (self.app.move_to_corner('top-left'), "break")[1],
+            '<Control-Alt-2>': lambda e: (self.app.move_to_corner('top-right'), "break")[1],
+            '<Control-Alt-3>': lambda e: (self.app.move_to_corner('bottom-left'), "break")[1],
+            '<Control-Alt-4>': lambda e: (self.app.move_to_corner('bottom-right'), "break")[1],
+            '<Control-Alt-5>': lambda e: (self.app.center_window(), "break")[1],
         }
         
         for shortcut, action in position_shortcuts.items():
@@ -219,63 +197,20 @@ class HotkeyManager:
             except Exception as e:
                 print(f"Error binding text area shortcut {shortcut}: {e}")
     
-    def _text_area_action(self, action: Callable) -> str:
-        """Execute action and return 'break' to prevent further processing"""
-        try:
-            action()
-        except Exception as e:
-            print(f"Error executing text area action: {e}")
-        return "break"
-    
     def update_hotkeys(self, new_hotkeys: Dict[str, str]):
-        """Update hotkey configuration"""
-        # Stop current listener
-        self.shutdown()
-        
-        # Update settings
-        self.app.settings.set('hotkeys', new_hotkeys)
-        
-        # Restart with new hotkeys
-        self._setup_hotkeys()
+        """Update hotkey configuration - only toggle supported"""
+        if 'toggle_overlay' in new_hotkeys:
+            self.toggle_hotkey = new_hotkeys['toggle_overlay']
+            self.shutdown()
+            self._setup_toggle_hotkey()
     
     def shutdown(self):
         """Shutdown hotkey manager"""
+        print("DEBUG: Shutting down thread-safe hotkey manager")
         self.running = False
-        
-        if self.listener:
-            try:
-                self.listener.stop()
-            except:
-                pass
         
         if self.hotkey_thread and self.hotkey_thread.is_alive():
             try:
                 self.hotkey_thread.join(timeout=1)
             except:
                 pass
-    
-    def get_available_modifiers(self) -> list:
-        """Get list of available modifier keys"""
-        return ['Ctrl', 'Alt', 'Shift', 'Cmd', 'Super']
-    
-    def get_available_keys(self) -> list:
-        """Get list of available keys"""
-        return [
-            # Letters
-            *[chr(i) for i in range(ord('a'), ord('z') + 1)],
-            # Numbers
-            *[str(i) for i in range(10)],
-            # Function keys
-            *[f'f{i}' for i in range(1, 13)],
-            # Special keys
-            'Enter', 'Return', 'Space', 'Tab', 'Escape', 'Esc',
-            'Backspace', 'Delete', 'Up', 'Down', 'Left', 'Right',
-            'Home', 'End', 'Page_Up', 'Page_Down'
-        ]
-    
-    def validate_hotkey(self, hotkey_string: str) -> bool:
-        """Validate hotkey string format"""
-        try:
-            return self._convert_hotkey_string(hotkey_string) is not None
-        except:
-            return False
