@@ -21,22 +21,21 @@ class StartupDialog:
         self.dialog = None
     
     def show(self) -> Optional[Dict]:
-        """Show startup configuration dialog"""
-        # Create hidden root window first
+        """Show startup configuration dialog.
+
+        Uses the Tk root directly as the dialog window.
+        After the user clicks Start, the root stays alive (widgets cleared)
+        so the overlay can reuse it — avoids multiple Tk() on Linux/X11.
+        """
         self.root = tk.Tk()
-        self.root.withdraw()
-        self.root.attributes('-alpha', 0.85)
-        self.root.geometry("1x1+0+0")
-        
-        # Create the actual config window
-        self.dialog = tk.Toplevel(self.root)
-        self.dialog.lift()
-        self.dialog.focus_force()
-        self.dialog.title("HUD Notes - Initial Setup")
-        # GET display info
+        self.root.title("HUD Notes - Initial Setup")
+        self.dialog = self.root  # Use root directly as the dialog
+
+        # Detect display settings now that a real Tk root exists
+        self.display_manager.detect_from_root(self.root)
+
         display_info = self.display_manager.get_display_info()
-        
-        # Calculate proper window size with DPI scaling
+
         base_width = 650
         base_height = 550
         dpi_scale = display_info.get('scale', 1.0)
@@ -44,7 +43,6 @@ class StartupDialog:
         window_width = int(base_width * max(1.0, dpi_scale))
         window_height = int(base_height * max(1.0, dpi_scale))
 
-        # Ensure it fits on screen
         screen_width = display_info['width']
         screen_height = display_info['height']
         window_width = min(window_width, screen_width - 100)
@@ -52,29 +50,28 @@ class StartupDialog:
 
         x = (screen_width - window_width) // 2
         y = (screen_height - window_height) // 2
-        self.dialog.geometry(f"{window_width}x{window_height}+{x}+{y}")
-        
-        self.dialog.configure(bg='#1a1a1a')
-        self.dialog.attributes('-topmost', True)
-        self.dialog.lift()
-        self.dialog.focus_force()
-        self.dialog.grab_set()
-        self.dialog.resizable(True, True)
-        
-        # Ensure window is shown properly
-        self.dialog.deiconify()
-        self.dialog.lift()
-        self.dialog.focus_force()
-        
+        self.root.geometry(f"{window_width}x{window_height}+{x}+{y}")
+
+        self.root.configure(bg='#1a1a1a')
+        self.root.attributes('-topmost', True)
+        self.root.resizable(True, True)
+        self.root.lift()
+        self.root.focus_force()
+
         self._create_ui()
-        
-        # Handle window close button
-        self.dialog.protocol("WM_DELETE_WINDOW", self._cancel_setup)
-        
-        # Run the dialog
-        self.dialog.mainloop()
-        
+
+        self.root.protocol("WM_DELETE_WINDOW", self._cancel_setup)
+
+        self.root.mainloop()
+
         return self.result
+
+    def get_root(self):
+        """Return the Tk root for reuse by the overlay.
+        Returns None if setup was cancelled (root was destroyed)."""
+        if self.root and self.result:
+            return self.root
+        return None
     
     def _create_ui(self):
         """Create the startup dialog UI"""
@@ -83,7 +80,7 @@ class StartupDialog:
         main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
         
         # Title
-        title_label = tk.Label(main_frame, text="🚀 HUD Notes Setup", 
+        title_label = tk.Label(main_frame, text=">> HUD Notes Setup",
                               bg='#1a1a1a', fg='#00ff41',
                               font=('Consolas', 18, 'bold'))
         title_label.pack(pady=(0, 20))
@@ -108,7 +105,7 @@ class StartupDialog:
         dir_frame = tk.Frame(parent, bg='#1a1a1a')
         dir_frame.pack(fill=tk.X, pady=10)
         
-        tk.Label(dir_frame, text="📁 Notes Directory:", 
+        tk.Label(dir_frame, text="[+] Notes Directory:",
                 bg='#1a1a1a', fg='#00ff41', font=('Consolas', 12, 'bold')).pack(anchor=tk.W)
         
         default_notes_dir = os.path.expanduser("~/Documents/HUD_Notes")
@@ -133,7 +130,7 @@ class StartupDialog:
         author_frame = tk.Frame(parent, bg='#1a1a1a')
         author_frame.pack(fill=tk.X, pady=10)
         
-        tk.Label(author_frame, text="👤 Author Name:", 
+        tk.Label(author_frame, text="[*] Author Name:",
                 bg='#1a1a1a', fg='#00ff41', font=('Consolas', 12, 'bold')).pack(anchor=tk.W)
         
         self.author_var = tk.StringVar(value=os.getenv('USERNAME', os.getenv('USER', 'User')))
@@ -146,7 +143,7 @@ class StartupDialog:
         title_frame = tk.Frame(parent, bg='#1a1a1a')
         title_frame.pack(fill=tk.X, pady=10)
         
-        tk.Label(title_frame, text="📝 Initial Note Title:", 
+        tk.Label(title_frame, text="[#] Initial Note Title:",
                 bg='#1a1a1a', fg='#00ff41', font=('Consolas', 12, 'bold')).pack(anchor=tk.W)
         
         self.title_var = tk.StringVar(value=f"Notes - {datetime.now().strftime('%Y-%m-%d')}")
@@ -186,7 +183,7 @@ class StartupDialog:
         info_frame = tk.Frame(parent, bg='#1a1a1a')
         info_frame.pack(fill=tk.X, pady=(20, 0))
         
-        info_text = ("💡 This setup creates your notes directory and templates folder.\n"
+        info_text = ("[i] This setup creates your notes directory and templates folder.\n"
                     "You can add custom templates to the templates/ directory later.\n"
                     "Configuration will be saved to .note_config.json in your notes directory.")
         
@@ -202,20 +199,21 @@ class StartupDialog:
             self.dir_var.set(directory)
     
     def _save_config(self):
-        """Save configuration and close"""
+        """Save configuration, clear widgets, keep root alive for overlay reuse"""
         self.result = {
             'notes_dir': self.dir_var.get(),
             'templates_dir': os.path.join(self.dir_var.get(), "templates"),
             'author_name': self.author_var.get(),
             'note_title': self.title_var.get()
         }
-        self.dialog.destroy()
-        self.root.destroy()
-    
+        # Clear all child widgets so overlay gets a clean root
+        for widget in self.root.winfo_children():
+            widget.destroy()
+        self.root.quit()  # Exit mainloop but keep root alive
+
     def _cancel_setup(self):
-        """Cancel setup"""
+        """Cancel setup and destroy everything"""
         self.result = None
-        self.dialog.destroy()
         self.root.destroy()
 
 
@@ -306,7 +304,7 @@ class TemplateSelectionDialog:
         main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
         
         # Title
-        title_label = tk.Label(main_frame, text="📋 Choose Note Template", 
+        title_label = tk.Label(main_frame, text=">> Choose Note Template",
                               bg='#1a1a1a', fg='#00ff41',
                               font=('Consolas', 16, 'bold'))
         title_label.pack(pady=(0, 20))
@@ -362,7 +360,7 @@ class TemplateSelectionDialog:
         # Populate listbox
         self.template_names = self.template_manager.get_template_names()
         for i, template_name in enumerate(sorted(self.template_names)):
-            self.template_listbox.insert(tk.END, f"📝 {template_name}")
+            self.template_listbox.insert(tk.END, f"  {template_name}")
             if template_name == "Basic":
                 self.template_listbox.selection_set(i)
         
@@ -423,7 +421,7 @@ class TemplateSelectionDialog:
         tk.Button(button_frame, text="✓ Create with Template", command=self._create_with_template,
                  bg='#006600', fg='white', **button_style).pack(side=tk.LEFT, padx=5)
         
-        tk.Button(button_frame, text="📄 Create Blank", command=self._create_blank,
+        tk.Button(button_frame, text="Create Blank", command=self._create_blank,
                  bg='#333333', fg='white', **button_style).pack(side=tk.LEFT, padx=5)
         
         tk.Button(button_frame, text="✗ Cancel", command=self._cancel,
@@ -454,10 +452,8 @@ class TemplateSelectionDialog:
             messagebox.showwarning("No Selection", "Please select a template first.")
             return
         
-        # Proper window cleanup
         if self.window:
             try:
-                self.window.quit()
                 self.window.destroy()
             except:
                 pass
@@ -469,22 +465,19 @@ class TemplateSelectionDialog:
             'action': 'blank',
             'content': ''
         }
-        # Proper window cleanup
         if self.window:
             try:
-                self.window.quit()
                 self.window.destroy()
             except:
                 pass
             self.window = None
-    
+
     def _cancel(self):
         """Cancel template selection"""
         self.result = None
         if self.window:
             try:
-                self.window.quit()  # Exit the mainloop first
-                self.window.destroy()  # Then destroy the window
+                self.window.destroy()
             except:
                 pass
             self.window = None
@@ -553,7 +546,6 @@ class SettingsDialog:
         self.window.bind('<Return>', lambda e: self._apply_settings())
         self.window.bind('<Escape>', lambda e: self.window.destroy())
         
-        print(f"Settings window created: {window_width}x{window_height}")  # Debug output
     
     def _create_ui(self):
         """Create settings UI"""
@@ -742,7 +734,7 @@ class SettingsDialog:
         placeholder_frame = tk.Frame(advanced_frame, bg='#1a1a1a')
         placeholder_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
         
-        tk.Label(placeholder_frame, text="🚧 Future Advanced Features", 
+        tk.Label(placeholder_frame, text="[!] Future Advanced Features",
                 bg='#1a1a1a', fg='#00ff41',
                 font=('Consolas', 14, 'bold')).pack(pady=(0, 15))
         
@@ -775,7 +767,7 @@ class SettingsDialog:
         tk.Button(button_frame, text="✓ Apply & Close", command=self._apply_settings,
                  bg='#006600', fg='white', **button_style).pack(side=tk.LEFT, padx=5)
         
-        tk.Button(button_frame, text="🔄 Reset Defaults", command=self._reset_defaults,
+        tk.Button(button_frame, text="Reset Defaults", command=self._reset_defaults,
                  bg='#cc6600', fg='white', **button_style).pack(side=tk.LEFT, padx=5)
         
         tk.Button(button_frame, text="✗ Cancel", command=self.window.destroy,

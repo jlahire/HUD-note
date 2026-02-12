@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# HUD Notes v2.0.4 Installation Script
+# HUD Notes v2.1.0 Installation Script
 # Simple global installation - works best on single monitor Windows/Linux
 
 set -e
@@ -17,7 +17,7 @@ SCRIPT_NAME="hud-notes"
 PYTHON_SCRIPT="main.py"
 INSTALL_DIR="/usr/local/bin"
 
-echo -e "${CYAN}HUD Notes v2.0.4 Installation${NC}"
+echo -e "${CYAN}HUD Notes v2.1.0 Installation${NC}"
 echo "=============================="
 echo
 
@@ -77,7 +77,7 @@ fi
 print_status "Creating wrapper script..."
 SCRIPT_DIR="$(pwd)"
 WRAPPER_CONTENT="#!/bin/bash
-# HUD Notes v2.0.4 Wrapper
+# HUD Notes v2.1.0 Wrapper
 SCRIPT_DIR=\"$SCRIPT_DIR\"
 PYTHON_SCRIPT=\"\$SCRIPT_DIR/main.py\"
 
@@ -159,8 +159,7 @@ echo "  Ctrl+Alt+H             # Toggle overlay (global hotkey)"
 echo
 echo "Known issues:"
 echo "  - Don't use Ctrl+Alt+P (preview breaks tabs)"
-echo "  - Multi-monitor features don't work"
-echo "  - Linux/X11 can be flaky"
+echo "  - Multi-monitor features don't work yet"
 echo
 echo "Uninstall:"
 echo "  sudo rm $INSTALL_DIR/$SCRIPT_NAME"

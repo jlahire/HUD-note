@@ -10,41 +10,32 @@ from typing import Dict, List, Tuple
 
 class DisplayManager:
     """Manages display detection, DPI scaling, and window positioning"""
-    
+
     def __init__(self):
-        self.screen_width = 0
-        self.screen_height = 0
+        self.screen_width = 1920
+        self.screen_height = 1080
         self.dpi_scale = 1.0
         self.system_font_size = 9
         self.displays = []
         self.current_display = 0
-        
-        self._detect_display_settings()
+        self._detected = False
     
-    def _detect_display_settings(self):
-        """Detect current display settings and DPI scaling"""
-        # Create temporary hidden window to get display info
-        temp_root = tk.Tk()
-        temp_root.withdraw()
-        temp_root.attributes('-alpha', 0)
-        temp_root.geometry("1x1+0+0")
-        
+    def detect_from_root(self, root):
+        """Detect display settings using an existing Tk root window.
+
+        Call this once a Tk root exists to get accurate screen dimensions.
+        """
         try:
-            # Get screen dimensions
-            self.screen_width = temp_root.winfo_screenwidth()
-            self.screen_height = temp_root.winfo_screenheight()
-            
-            # Detect multiple displays
+            self.screen_width = root.winfo_screenwidth()
+            self.screen_height = root.winfo_screenheight()
             self._detect_displays()
-            
-            # Get DPI scaling factor
+
             try:
-                dpi_x = temp_root.winfo_fpixels('1i')
+                dpi_x = root.winfo_fpixels('1i')
                 self.dpi_scale = dpi_x / 96.0
             except:
                 self.dpi_scale = 1.0
-            
-            # Get system font size
+
             try:
                 default_font = font.nametofont("TkDefaultFont")
                 self.system_font_size = default_font['size']
@@ -52,11 +43,11 @@ class DisplayManager:
                     self.system_font_size = int(abs(self.system_font_size) * 72 / dpi_x)
             except:
                 self.system_font_size = 9
-                
-        finally:
-            temp_root.destroy()
-            
-                # Ensure we have valid values - add fallbacks
+
+        except Exception:
+            pass  # Keep fallback values
+
+        # Ensure valid values
         if not self.screen_width or self.screen_width <= 0:
             self.screen_width = 1920
         if not self.screen_height or self.screen_height <= 0:
@@ -65,7 +56,8 @@ class DisplayManager:
             self.dpi_scale = 1.0
         if not self.system_font_size or self.system_font_size <= 0:
             self.system_font_size = 9
-            
+
+        self._detected = True
         print(f"Display settings: {self.screen_width}x{self.screen_height}, DPI scale: {self.dpi_scale}")
     
     def _detect_displays(self):
@@ -200,9 +192,13 @@ class DisplayManager:
         
         return self.get_window_bounds(x, y, width, height)
     
-    def refresh_display_settings(self):
-        """Refresh display settings (useful after display changes)"""
-        self._detect_display_settings()
+    def refresh_display_settings(self, root=None):
+        """Refresh display settings (useful after display changes).
+
+        Pass the app's existing Tk root to avoid creating a new Tk instance.
+        """
+        if root:
+            self.detect_from_root(root)
     
     def get_border_dimensions(self) -> Dict:
         """Get dimensions for screen borders"""
@@ -215,11 +211,6 @@ class DisplayManager:
     
     def get_hotkey_bar_dimensions(self) -> Dict:
         """Get dimensions for hotkey display bar"""
-        # Ensure we have valid screen dimensions
-        if not self.screen_width or not self.screen_height:
-            self._detect_display_settings()
-        
-        # Fallback values if detection still fails
         screen_width = self.screen_width or 1920
         screen_height = self.screen_height or 1080
         dpi_scale = self.dpi_scale or 1.0
@@ -268,13 +259,7 @@ class DisplayManager:
         y = max(50, min(y, self.screen_height - height - 50))
         
         return x, y
-        
-        return {
-            'height': hotkey_height,
-            'font_size': font_size,
-            'y_position': self.screen_height - hotkey_height,
-            'width': self.screen_width
-        }
+
 
 class PlatformManager:
     """Manages platform-specific GUI attributes and behaviors"""

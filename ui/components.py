@@ -13,6 +13,7 @@ class StatusBar:
         self.settings = settings
         self.display_manager = display_manager
         self.theme_manager = theme_manager
+        self.app = app
         
         # Create status frame
         status_height = display_manager.get_scaled_dimension(20)
@@ -66,12 +67,7 @@ class StatusBar:
                                     width=button_size, height=1,
                                     relief=tk.FLAT, cursor="hand2")
             alpha_minus_btn.pack(side=tk.LEFT, padx=1)
-            print(f"Creating transparency button α- with command: {app.increase_transparency}")
-            try:
-                create_tooltip(alpha_minus_btn, "Decrease Transparency\n(More Transparent)\nHotkey: Alt+-", self.settings)
-                print("✓ α- tooltip created")
-            except Exception as e:
-                print(f"✗ α- tooltip failed: {e}")
+            create_tooltip(alpha_minus_btn, "Decrease Transparency\n(More Transparent)\nHotkey: Alt+-", self.settings)
             
             # Transparency increase button (more opaque)
             alpha_plus_btn = tk.Button(trans_frame, text="α+", 
@@ -260,58 +256,46 @@ class HUDInterface:
             
     def _on_button_enter(self, event, button):
         """Handle button enter event"""
-        print(f"Button entered: {button['text']}")
         self._reset_window_cursor()
 
 class ScreenBorder:
     """Always-visible screen border"""
-    
-    def __init__(self, display_manager, theme_manager=None):
+
+    def __init__(self, display_manager, theme_manager=None, parent=None):
         self.display_manager = display_manager
         self.theme_manager = theme_manager
+        self.parent = parent
         self.border_windows = []
         self._create_borders()
-    
+
     def _create_borders(self):
         """Create screen border windows"""
         border_dims = self.display_manager.get_border_dimensions()
         border_width = border_dims['width']
         screen_width = border_dims['screen_width']
         screen_height = border_dims['screen_height']
-        
+
         # Get border color from theme if available
         if self.theme_manager:
             current_theme = self.theme_manager.get_current_theme()
             border_color = current_theme.get_color('border_color', '#00ff41') if current_theme else '#00ff41'
         else:
             border_color = "#00ff41"
-        
-        # Top border
-        top_border = tk.Toplevel()
-        top_border.geometry(f"{screen_width}x{border_width}+0+0")
-        top_border.configure(bg=border_color)
-        top_border.overrideredirect(True)
-        top_border.attributes('-topmost', True)
-        top_border.attributes('-alpha', 0.6)
-        self.border_windows.append(top_border)
-        
-        # Left border
-        left_border = tk.Toplevel()
-        left_border.geometry(f"{border_width}x{screen_height}+0+0")
-        left_border.configure(bg=border_color)
-        left_border.overrideredirect(True)
-        left_border.attributes('-topmost', True)
-        left_border.attributes('-alpha', 0.6)
-        self.border_windows.append(left_border)
-        
-        # Right border
-        right_border = tk.Toplevel()
-        right_border.geometry(f"{border_width}x{screen_height}+{screen_width-border_width}+0")
-        right_border.configure(bg=border_color)
-        right_border.overrideredirect(True)
-        right_border.attributes('-topmost', True)
-        right_border.attributes('-alpha', 0.6)
-        self.border_windows.append(right_border)
+
+        border_configs = [
+            f"{screen_width}x{border_width}+0+0",                              # Top
+            f"{border_width}x{screen_height}+0+0",                              # Left
+            f"{border_width}x{screen_height}+{screen_width-border_width}+0",    # Right
+        ]
+
+        for geometry in border_configs:
+            border = tk.Toplevel(self.parent) if self.parent else tk.Toplevel()
+            border.geometry(geometry)
+            border.configure(bg=border_color)
+            border.overrideredirect(True)
+            border.attributes('-topmost', True)
+            border.attributes('-alpha', 0.6)
+            self.border_windows.append(border)
     
     def update_theme(self, theme_manager):
         """Update border colors when theme changes"""
@@ -420,7 +404,6 @@ def create_tooltip(widget, text, settings=None):
         # Store reference
         widget.tooltip_window = tooltip
         
-        print(f"Tooltip shown: {text[:30]}...")  # Debug output
     
     def hide_tooltip(event):
         if hasattr(widget, 'tooltip_window') and widget.tooltip_window:

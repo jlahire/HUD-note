@@ -1,90 +1,76 @@
-# HUD Notes v2.0.4 - Overlay Note-Taking
+# HUD Notes v2.1.0 - Overlay Note-Taking
 
-> This project was built with AI help. It's designed for my personal use when I'm out with just my laptop and need quick notes during CTF competitions, coding sessions, and research. Feel free to use it, but test it yourself first.
+> Built with AI help. Designed for quick notes during CTF competitions, coding sessions, and research. Feel free to use it, but test it yourself first.
 
-A floating note-taking overlay that stays on top of everything else. Built with Python and Tkinter because it works everywhere.
-
-## What's New
-
-### Tab System
-
-- Open multiple notes at once in tabs
-- Each tab saves automatically
-- Click to switch between notes
-- Close tabs with the X button
-
-### Simplified Interface
-
-- Just the buttons you actually need
-- Text size controls (T-/T+)
-- Transparency controls (O-/O+)
-- New note, Open file, Settings
-- That's it
-
-### Built-in Templates
-
-- No more external template files that can break
-- 11 templates built into the code
-- Just works
-
-## Known Issues
-
-**Don't use the preview hotkey** (`Ctrl+Alt+P`) - it breaks with the tab system. Everything else works fine.
-
-**Tab closing quirk** - When you close the last tab, it automatically creates a new "Untitled" tab. Sometimes this can cause weird window behavior. Just roll with it or restart the app if things get wonky.
-
-**Multi-monitor issues** - The multi-window/display cycling features don't work properly yet. Stick to single monitor for now.
-
-**Linux/X11 problems** - Some features are flaky on Linux, especially window positioning and transparency. Works best on Windows. If you're on Linux, expect some rough edges.
+A floating note-taking overlay that stays on top of everything else. Built with Python and Tkinter.
 
 ## Quick Start
 
 ```bash
-pip install pynput markdown2
 git clone https://github.com/jlahire/HUD-note.git
 cd HUD-note
+pip install -r requirements.txt
 python main.py
 ```
 
-First run will ask where to save notes and your name. Then press `Ctrl+Alt+H` to show/hide the overlay.
+First run opens a setup dialog for your notes directory and author name. Then press `Ctrl+Alt+H` to toggle the overlay.
 
-## Installation Options
+## Features
 
-**Run directly:**
+- **Tab system** - Open multiple notes at once, click to switch, close with X
+- **11 built-in templates** - CTF writeup, meeting notes, code review, and more
+- **10 color themes** - Matrix Green, Cyber Blue, Neon Purple, etc.
+- **Global hotkeys** - Show/hide, new note, save, all without leaving your current app
+- **Auto-save** - Notes save automatically so you don't lose work
+- **Syntax highlighting** - Basic markdown highlighting in the editor
+- **Transparency controls** - Adjust overlay opacity to see through it
+
+## Installation
+
+See [INSTALL.md](INSTALL.md) for detailed instructions for Windows, Linux, and macOS.
+
+**Short version (all platforms):**
 
 ```bash
+# 1. Install Python 3.8+
+# 2. Clone and install dependencies
+git clone https://github.com/jlahire/HUD-note.git
+cd HUD-note
+pip install -r requirements.txt
+
+# 3. Run
 python main.py
 ```
 
-**Install globally:**
+**Linux/macOS global install:**
 
 ```bash
-./setup.sh          # One-time setup
-./install_hud_notes.sh   # Global installation
+./setup.sh
 ```
 
 **Update existing installation:**
 
 ```bash
-./update.sh         # Updates ~/tools/hud-notes from current directory
+./update.sh
 ```
-
-The update script creates automatic backups and logs everything to `update-YYYYMMDD.txt`.
 
 ## How to Use
 
-- **New note**: Click "New" or `Ctrl+Alt+N` - opens in new tab
-- **Open file**: Click "Open" or `Ctrl+Alt+O` - opens in new tab
-- **Save**: `Ctrl+Alt+S` saves current tab
-- **Switch tabs**: Click on tab names
-- **Close tabs**: Click the X on each tab
-- **Font size**: T- and T+ buttons
-- **Transparency**: O- and O+ buttons
-- **Hide overlay**: Press `Esc`
+| Action | Button / Hotkey |
+|--------|----------------|
+| Show/hide overlay | `Ctrl+Alt+H` |
+| New note (new tab) | Click "New" or `Ctrl+Alt+N` |
+| Open file (new tab) | Click "Open" or `Ctrl+Alt+O` |
+| Save current tab | `Ctrl+Alt+S` |
+| Settings | `Ctrl+Alt+G` |
+| Font size up/down | T+ / T- buttons |
+| Transparency up/down | O+ / O- buttons |
+| Hide overlay | `Esc` |
+| Reset window position | `Ctrl+Alt+R` |
 
 ## Templates
 
-Built-in templates for different use cases:
+Built-in templates available when creating a new note:
 
 - Basic note
 - Meeting notes
@@ -100,7 +86,7 @@ Built-in templates for different use cases:
 
 ## Themes
 
-10+ built-in color themes:
+Change in Settings (`Ctrl+Alt+G`):
 
 - Matrix Green (default)
 - Cyber Blue
@@ -113,72 +99,34 @@ Built-in templates for different use cases:
 - Electric Pink
 - Deep Ocean
 
-Change themes in Settings.
-
 ## File Structure
 
-```text
-hud-notes/
-├── config/          # Settings
-├── core/            # Main app logic
-├── features/        # Hotkeys, window management
-├── ui/              # Interface and tabs
-├── utils/           # Helper functions
-└── main.py          # Run this
+See [tree.md](tree.md) for the full project tree.
+
+```
+HUD-note/
+├── main.py              # Entry point
+├── core/                # App logic and templates
+├── ui/                  # Interface, dialogs, tabs, themes
+├── features/            # Hotkeys, window management, syntax highlighting
+├── config/              # Settings manager
+└── utils/               # Display and file utilities
 ```
 
-## Hotkeys
+## Known Issues
 
-| Key | Action |
-|-----|--------|
-| `Ctrl+Alt+H` | Show/hide overlay |
-| `Ctrl+Alt+N` | New note (new tab) |
-| `Ctrl+Alt+O` | Open file (new tab) |
-| `Ctrl+Alt+S` | Save current tab |
-| `Ctrl+Alt+G` | Settings |
-| `Ctrl+Alt+±` | Font size |
-| `Alt+±` | Transparency |
-| `Esc` | Hide |
-
-## Common Problems
-
-- **Preview hotkey broken** - Don't use `Ctrl+Alt+P` with tabs
-- **Tab auto-creation** - Closing the last tab makes a new "Untitled" tab that can act weird
-- **Multi-monitor not working** - Display cycling and multi-window features are broken
-- **Linux/X11 issues** - Window positioning, transparency, and other features can be flaky
-- **Hotkeys not working** - Allow Python through Windows Firewall
-- **Wrong size/position** - Press `Ctrl+Alt+R` to reset
-- **Can't see overlay** - Check if transparency is too high
-- **Window acting strange** - Restart the app (`python main.py`)
+- **Preview hotkey** (`Ctrl+Alt+P`) - broken with the tab system, don't use it
+- **Multi-monitor** - display cycling features don't work properly, stick to single monitor
+- **Tab closing** - closing the last tab auto-creates an "Untitled" tab that can act odd
 
 ## Configuration
 
-Settings are saved in `.note_config.json` in your notes folder. Delete this file to reset everything.
-
-## Why This Exists
-
-I needed something that:
-
-- Stays on top during CTF competitions
-- Takes up 1/4 of my screen (right side)
-- Saves automatically so I don't lose notes
-- Works on any screen size (single monitor)
-- Has templates for different note types
-- Doesn't require external dependencies
-- Actually works reliably on Windows
-
-Most note apps either take over your whole screen or disappear behind other windows. This stays put and gets out of your way.
+Settings are saved in `.note_config.json` inside your notes directory. Delete this file to reset everything to defaults.
 
 ## License
 
-AGPL-3.0 - see LICENSE file
+AGPL-3.0 - see [LICENSE](LICENSE)
 
 ## Issues
 
-If something breaks, check the console output when you run `python main.py`. The debug version shows what's going wrong.
-
-Known issues: Preview feature doesn't play nice with tabs yet. Also, closing all tabs creates a new "Untitled" tab that sometimes behaves oddly. Multi-monitor support is broken. Linux/X11 has various issues with window management. Built and tested mainly on Windows. Will fix these eventually.
-
----
-
-**Quick tip**: Use `Ctrl+Alt+H` to quickly show/hide during any activity. Open different topics in separate tabs.
+If something breaks, check the terminal output when running `python main.py`. File issues at [github.com/jlahire/HUD-note/issues](https://github.com/jlahire/HUD-note/issues).

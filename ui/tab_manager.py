@@ -54,13 +54,22 @@ class TabManager:
         # Create initial tab
         self.create_new_tab()
     
+    def _get_theme_color(self, key, default):
+        """Get color from theme or fall back to default"""
+        if self.theme_manager:
+            theme = self.theme_manager.get_current_theme()
+            if theme:
+                return theme.get_color(key, default)
+        return default
+
     def _create_ui(self):
         """Create tab interface"""
         # Tab bar frame
-        self.tab_frame = tk.Frame(self.parent, bg='#2a2a2a', height=30)
+        tab_bg = self._get_theme_color('status_bg', '#2a2a2a')
+        self.tab_frame = tk.Frame(self.parent, bg=tab_bg, height=30)
         self.tab_frame.pack(fill=tk.X, padx=2, pady=(0, 2))
         self.tab_frame.pack_propagate(False)
-        
+
         # Content frame for text areas
         self.content_frame = tk.Frame(self.parent)
         self.content_frame.pack(fill=tk.BOTH, expand=True, padx=2, pady=2)
@@ -129,16 +138,20 @@ class TabManager:
     
     def _create_tab_button(self, tab: Tab):
         """Create tab button"""
-        button_frame = tk.Frame(self.tab_frame, bg='#2a2a2a')
+        tab_bg = self._get_theme_color('status_bg', '#2a2a2a')
+        btn_bg = self._get_theme_color('button_bg', '#3a3a3a')
+        btn_fg = self._get_theme_color('fg_color', '#ffffff')
+
+        button_frame = tk.Frame(self.tab_frame, bg=tab_bg)
         button_frame.pack(side=tk.LEFT, padx=1)
-        
+
         # Tab button
         tab_btn = tk.Button(
             button_frame,
             text=tab.get_display_title(),
             command=lambda: self.switch_to_tab(tab.tab_id),
-            bg='#3a3a3a',
-            fg='#ffffff',
+            bg=btn_bg,
+            fg=btn_fg,
             font=('Consolas', 9),
             relief=tk.FLAT,
             padx=8,
@@ -146,13 +159,13 @@ class TabManager:
             cursor="hand2"
         )
         tab_btn.pack(side=tk.LEFT)
-        
+
         # Close button
         close_btn = tk.Button(
             button_frame,
             text="×",
             command=lambda: self.close_tab(tab.tab_id),
-            bg='#3a3a3a',
+            bg=btn_bg,
             fg='#ff6666',
             font=('Arial', 8, 'bold'),
             relief=tk.FLAT,
@@ -161,49 +174,43 @@ class TabManager:
             cursor="hand2"
         )
         close_btn.pack(side=tk.LEFT)
-        
+
         self.tab_buttons[tab.tab_id] = {
             'frame': button_frame,
             'tab_btn': tab_btn,
             'close_btn': close_btn
         }
-        
-        # Apply theme to buttons (if theme manager is available)
-        if self.theme_manager:
-            theme = self.theme_manager.get_current_theme()
-            if theme:
-                tab_btn.config(
-                    bg=theme.get_color('button_bg', '#3a3a3a'),
-                    fg=theme.get_color('fg_color', '#ffffff')
-                )
     
     def switch_to_tab(self, tab_id: int):
         """Switch to specified tab"""
         if tab_id not in self.tabs:
             return
-        
+
+        btn_bg = self._get_theme_color('button_bg', '#3a3a3a')
+        btn_active = self._get_theme_color('button_active', '#4a4a4a')
+
         # Hide current tab
         if self.active_tab_id and self.active_tab_id in self.tabs:
             current_tab = self.tabs[self.active_tab_id]
             if current_tab.text_widget:
                 current_tab.text_widget.pack_forget()
-            
+
             # Update button appearance
             if self.active_tab_id in self.tab_buttons:
-                self.tab_buttons[self.active_tab_id]['tab_btn'].config(bg='#3a3a3a')
-        
+                self.tab_buttons[self.active_tab_id]['tab_btn'].config(bg=btn_bg)
+
         # Show new tab
         new_tab = self.tabs[tab_id]
         if new_tab.text_widget:
             new_tab.text_widget.pack(fill=tk.BOTH, expand=True)
             new_tab.text_widget.focus()
-        
+
         # Update button appearance
         if tab_id in self.tab_buttons:
-            self.tab_buttons[tab_id]['tab_btn'].config(bg='#4a4a4a')
-        
+            self.tab_buttons[tab_id]['tab_btn'].config(bg=btn_active)
+
         self.active_tab_id = tab_id
-        
+
         # Update window title (if overlay is ready)
         if hasattr(self.app, 'overlay') and self.app.overlay:
             self.app.overlay.update_file_label()
@@ -346,23 +353,30 @@ class TabManager:
     
     def apply_theme(self, theme_manager):
         """Apply theme to all tabs"""
+        self.theme_manager = theme_manager
         for tab in self.tabs.values():
             if tab.text_widget:
                 theme_manager.apply_theme_to_text_widget(tab.text_widget)
-        
+
+        # Update tab bar background
+        tab_bg = self._get_theme_color('status_bg', '#2a2a2a')
+        self.tab_frame.config(bg=tab_bg)
+
         # Update tab buttons
         theme = theme_manager.get_current_theme()
         if theme:
+            btn_bg = theme.get_color('button_bg', '#3a3a3a')
+            btn_active = theme.get_color('button_active', '#4a4a4a')
+            fg_color = theme.get_color('fg_color', '#ffffff')
+
             for tab_id, buttons in self.tab_buttons.items():
-                bg_color = theme.get_color('button_bg', '#3a3a3a')
-                fg_color = theme.get_color('fg_color', '#ffffff')
-                
-                buttons['tab_btn'].config(bg=bg_color, fg=fg_color)
-                buttons['close_btn'].config(bg=bg_color)
-                
+                buttons['tab_btn'].config(bg=btn_bg, fg=fg_color)
+                buttons['close_btn'].config(bg=btn_bg)
+                buttons['frame'].config(bg=tab_bg)
+
                 # Highlight active tab
                 if tab_id == self.active_tab_id:
-                    buttons['tab_btn'].config(bg='#4a4a4a')
+                    buttons['tab_btn'].config(bg=btn_active)
     
     def cleanup(self):
         """Clean up resources"""

@@ -124,6 +124,10 @@ class SettingsManager:
             'Hacker Orange': {'bg': '#1a1a0a', 'fg': '#ff9900', 'accent': '#00ff00', 'select': '#3d3d1a'},
             'Terminal White': {'bg': '#000000', 'fg': '#ffffff', 'accent': '#ffff00', 'select': '#333333'},
             'Blood Red': {'bg': '#1a0000', 'fg': '#ff3333', 'accent': '#ffff00', 'select': '#3d1a1a'},
+            'Stealth Gray': {'bg': '#1a1a1a', 'fg': '#cccccc', 'accent': '#00aaff', 'select': '#333333'},
+            'Retro Amber': {'bg': '#0a0a00', 'fg': '#ffbb00', 'accent': '#00ff00', 'select': '#3d3d1a'},
+            'Electric Pink': {'bg': '#1a0a1a', 'fg': '#ff00aa', 'accent': '#00ffff', 'select': '#3d1a3d'},
+            'Deep Ocean': {'bg': '#001122', 'fg': '#4499ff', 'accent': '#00ffaa', 'select': '#1a2244'},
         }
     
     def apply_color_scheme(self, scheme_name: str):

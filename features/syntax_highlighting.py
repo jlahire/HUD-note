@@ -108,8 +108,11 @@ class SyntaxHighlighter:
         # Clear existing tags
         for tag in self.text_widget.tag_names():
             if tag not in ['sel', 'insert']:
-                self.text_widget.tag_delete(tag)
-        
+                self.text_widget.tag_remove(tag, "1.0", tk.END)
+
+        # Re-setup tags (ensures they exist after removal)
+        self.setup_tags()
+
         # Reapply highlighting
         self._highlight_markdown(content)
         self._highlight_code_blocks(content)

@@ -1,5 +1,4 @@
-# HUD Notes v2.0.4 Requirements
-# Core dependencies - minimal set that actually works
+# HUD Notes v2.1.0 Requirements
 
 # Global hotkey support (required)
 pynput>=1.7.6
@@ -7,13 +6,6 @@ pynput>=1.7.6
 # Markdown processing for templates and highlighting (required)
 markdown2>=2.4.0
 
-# GUI framework - tkinter usually comes with Python
+# tkinter is also required but comes with Python
 # If missing on Linux: sudo apt install python3-tk
-
-# That's it - keeping dependencies minimal
-# Optional features removed to reduce complexity
-
-# Known issues:
-# - Preview feature broken with tab system
-# - Multi-monitor support not working
-# - Linux/X11 compatibility issues
+# If missing on macOS: brew install python-tk

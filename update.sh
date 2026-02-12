@@ -1,7 +1,8 @@
 #!/bin/bash
 
-# HUD Notes v2.0.4 Update Script
-# Updates existing installation in ~/tools/hud-notes
+# HUD Notes v2.1.0 Update Script
+# Updates existing global installation in ~/tools/hud-notes
+# Creates automatic backups and logs everything
 
 set -e
 
@@ -13,224 +14,151 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m'
 
-# Setup logging
+# Setup
 TIMESTAMP=$(date +%Y%m%d)
 LOG_FILE="update-${TIMESTAMP}.txt"
 TOOLS_DIR="$HOME/tools"
 TARGET_DIR="$TOOLS_DIR/hud-notes"
 
-# Function to log and print
-log_print() {
-    echo -e "$1" | tee -a "$LOG_FILE"
-}
-
-# Function for status messages (log and print)
+log_print() { echo -e "$1" | tee -a "$LOG_FILE"; }
 log_status() { log_print "${BLUE}[INFO]${NC} $1"; }
 log_success() { log_print "${GREEN}[OK]${NC} $1"; }
-log_warning() { log_print "${YELLOW}[WARNING]${NC} $1"; }
+log_warning() { log_print "${YELLOW}[WARN]${NC} $1"; }
 log_error() { log_print "${RED}[ERROR]${NC} $1"; }
 
-# Start logging
 echo "HUD Notes Update Log - $(date)" > "$LOG_FILE"
 echo "===============================" >> "$LOG_FILE"
 echo "" >> "$LOG_FILE"
 
-log_print "${CYAN}HUD Notes v2.0.4 Update Script${NC}"
-log_print "==============================="
+log_print "${CYAN}HUD Notes v2.1.0 Update${NC}"
+log_print "========================"
 log_print ""
 
-# Check if we're in source directory
+# Check source directory
 if [ ! -f "main.py" ]; then
     log_error "main.py not found in current directory!"
-    log_error "Run this script from the HUD-note source directory."
+    log_error "Run this from the HUD-note source directory."
     exit 1
 fi
-log_success "Found main.py in current directory"
+log_success "Source directory OK"
 
-# Check if tools directory exists
-if [ ! -d "$TOOLS_DIR" ]; then
-    log_error "Tools directory not found: $TOOLS_DIR"
-    log_error "Create it first: mkdir -p $TOOLS_DIR"
-    exit 1
-fi
-log_success "Found tools directory: $TOOLS_DIR"
-
-# Check if target installation exists
+# Check target installation
 if [ ! -d "$TARGET_DIR" ]; then
-    log_error "HUD Notes installation not found: $TARGET_DIR"
-    log_error "Install first with: ./install_hud_notes.sh"
+    log_error "No existing installation at $TARGET_DIR"
+    log_error "Run ./setup.sh first to install."
     exit 1
 fi
-log_success "Found existing installation: $TARGET_DIR"
+log_success "Found installation: $TARGET_DIR"
 
 # Create backup
 BACKUP_DIR="${TARGET_DIR}.bak-${TIMESTAMP}"
 log_status "Creating backup: $BACKUP_DIR"
-
 if cp -r "$TARGET_DIR" "$BACKUP_DIR"; then
-    log_success "Backup created successfully"
+    log_success "Backup created"
 else
-    log_error "Failed to create backup"
+    log_error "Backup failed"
     exit 1
 fi
 
-# Check what we're about to copy
-log_status "Files to be updated:"
-FILES_TO_COPY=$(find . -maxdepth 1 -type f -name "*.py" -o -name "*.sh" -o -name "*.txt" -o -name "*.md" | grep -v "$LOG_FILE" | sort)
+# List what will be updated
+log_status "Files to update:"
 
-if [ -z "$FILES_TO_COPY" ]; then
-    log_warning "No files found to copy"
-else
-    for file in $FILES_TO_COPY; do
-        log_print "  - $file"
-    done
-fi
-
-# Check for directories to copy
-DIRS_TO_COPY=""
-for dir in ui config core features utils templates; do
+# Collect source files
+SOURCE_FILES=$(find . -maxdepth 1 -type f \( -name "*.py" -o -name "*.sh" -o -name "*.txt" -o -name "*.md" \) ! -name "$LOG_FILE" | sort)
+SOURCE_DIRS=""
+for dir in config core features ui utils; do
     if [ -d "$dir" ]; then
-        DIRS_TO_COPY="$DIRS_TO_COPY $dir"
-        log_print "  - $dir/ (directory)"
+        SOURCE_DIRS="$SOURCE_DIRS $dir"
+        log_print "  $dir/"
     fi
 done
+for f in $SOURCE_FILES; do
+    log_print "  $f"
+done
 
-# Ask for confirmation
+# Confirm
 log_print ""
-read -p "Continue with update? (y/N): " -n 1 -r
+read -p "Proceed with update? (y/N): " -n 1 -r
 echo
-log_print "User response: $REPLY"
+log_print "Response: $REPLY"
 
 if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    log_warning "Update cancelled by user"
-    log_status "Removing backup: $BACKUP_DIR"
+    log_warning "Cancelled by user"
     rm -rf "$BACKUP_DIR"
+    log_status "Backup removed"
     exit 0
 fi
 
-# Start update process
-log_print ""
-log_status "Starting update process..."
-
 # Copy files
-if [ -n "$FILES_TO_COPY" ]; then
-    log_status "Copying files..."
-    for file in $FILES_TO_COPY; do
-        if cp "$file" "$TARGET_DIR/"; then
-            log_success "Copied: $file"
-        else
-            log_error "Failed to copy: $file"
-        fi
-    done
-fi
+log_print ""
+log_status "Updating..."
 
-# Copy directories
-if [ -n "$DIRS_TO_COPY" ]; then
-    log_status "Copying directories..."
-    for dir in $DIRS_TO_COPY; do
-        if cp -r "$dir" "$TARGET_DIR/"; then
-            log_success "Copied: $dir/"
-        else
-            log_error "Failed to copy: $dir/"
-        fi
-    done
-fi
+ERRORS=0
 
-# Make main script executable
-if chmod +x "$TARGET_DIR/main.py"; then
-    log_success "Made main.py executable"
-else
-    log_warning "Could not make main.py executable"
-fi
-
-# Make other scripts executable
-for script in install_hud_notes.sh setup.sh uninstall_hud_notes.sh; do
-    if [ -f "$TARGET_DIR/$script" ]; then
-        if chmod +x "$TARGET_DIR/$script"; then
-            log_success "Made $script executable"
-        else
-            log_warning "Could not make $script executable"
-        fi
+for f in $SOURCE_FILES; do
+    if cp "$f" "$TARGET_DIR/"; then
+        log_success "  $f"
+    else
+        log_error "  $f"
+        ERRORS=$((ERRORS + 1))
     fi
 done
 
-# Check if global command still works
-log_status "Testing global command..."
-if command -v hud-notes &> /dev/null; then
-    log_success "Global 'hud-notes' command is available"
-    
-    # Quick test
-    if timeout 3 hud-notes --help 2>/dev/null || timeout 3 hud-notes --version 2>/dev/null; then
-        log_success "HUD Notes can execute successfully"
+for dir in $SOURCE_DIRS; do
+    if cp -r "$dir" "$TARGET_DIR/"; then
+        log_success "  $dir/"
     else
-        log_warning "Could not test execution (probably normal)"
+        log_error "  $dir/"
+        ERRORS=$((ERRORS + 1))
     fi
+done
+
+# Make scripts executable
+for script in main.py setup.sh install_hud_notes.sh update.sh; do
+    if [ -f "$TARGET_DIR/$script" ]; then
+        chmod +x "$TARGET_DIR/$script"
+    fi
+done
+log_success "Scripts marked executable"
+
+# Verify global command
+if command -v hud-notes &> /dev/null; then
+    log_success "'hud-notes' command available"
 else
-    log_warning "Global 'hud-notes' command not found"
-    log_warning "You may need to reinstall: ./install_hud_notes.sh"
+    log_warning "'hud-notes' command not found - you may need to run ./install_hud_notes.sh"
 fi
 
-# Show update summary
+# Summary
+FILE_COUNT=$(echo "$SOURCE_FILES" | wc -w)
+DIR_COUNT=$(echo "$SOURCE_DIRS" | wc -w)
+
 log_print ""
 log_print "${GREEN}Update Summary${NC}"
 log_print "=============="
-
-# Count what was updated
-FILE_COUNT=$(echo "$FILES_TO_COPY" | wc -w)
-DIR_COUNT=$(echo "$DIRS_TO_COPY" | wc -w)
-
-log_print "Files updated: $FILE_COUNT"
-log_print "Directories updated: $DIR_COUNT"
-log_print "Backup created: $BACKUP_DIR"
-log_print "Installation: $TARGET_DIR"
-
-# Check version (if available)
-if [ -f "$TARGET_DIR/main.py" ]; then
-    VERSION_INFO=$(grep -i "version\|v[0-9]" "$TARGET_DIR/main.py" | head -1 | cut -c1-50 || echo "Unknown")
-    log_print "Version info: $VERSION_INFO"
-fi
-
-log_print ""
-log_print "${GREEN}Update Complete!${NC}"
-log_print "================"
-log_print ""
-log_print "What was updated:"
-log_print "• Source files copied to: $TARGET_DIR"
-log_print "• Backup saved as: $BACKUP_DIR"
-log_print "• Log saved as: $LOG_FILE"
-log_print ""
-log_print "Test the update:"
-log_print "• Run: ${YELLOW}hud-notes${NC}"
-log_print "• Or: ${YELLOW}python3 $TARGET_DIR/main.py${NC}"
-log_print ""
-log_print "If something breaks:"
-log_print "• Restore backup: ${YELLOW}cp -r $BACKUP_DIR $TARGET_DIR${NC}"
-log_print "• Check log: ${YELLOW}cat $LOG_FILE${NC}"
-log_print ""
+log_print "  Files: $FILE_COUNT"
+log_print "  Directories: $DIR_COUNT"
+log_print "  Errors: $ERRORS"
+log_print "  Backup: $BACKUP_DIR"
+log_print "  Log: $LOG_FILE"
 
 # Clean up old backups (keep last 5)
-log_status "Cleaning up old backups..."
-OLD_BACKUPS=$(find "$TOOLS_DIR" -maxdepth 1 -name "hud-notes.bak-*" -type d | sort -r | tail -n +6)
-
+OLD_BACKUPS=$(find "$TOOLS_DIR" -maxdepth 1 -name "hud-notes.bak-*" -type d 2>/dev/null | sort -r | tail -n +6)
 if [ -n "$OLD_BACKUPS" ]; then
     for backup in $OLD_BACKUPS; do
-        log_status "Removing old backup: $(basename "$backup")"
         rm -rf "$backup"
+        log_status "Removed old backup: $(basename "$backup")"
     done
-    log_success "Old backups cleaned up"
+fi
+
+log_print ""
+if [ "$ERRORS" -eq 0 ]; then
+    log_print "${GREEN}Update complete!${NC}"
 else
-    log_status "No old backups to clean up"
+    log_print "${YELLOW}Update finished with $ERRORS error(s). Check log: $LOG_FILE${NC}"
 fi
 
-# Final status
 log_print ""
-log_print "${CYAN}Update completed successfully!${NC}"
-log_print "Log saved to: $LOG_FILE"
-log_print ""
+log_print "Test: ${YELLOW}hud-notes${NC}  or  ${YELLOW}python3 $TARGET_DIR/main.py${NC}"
+log_print "Rollback: ${YELLOW}cp -r $BACKUP_DIR $TARGET_DIR${NC}"
 
-# Show any warnings
-if grep -q "WARNING\|ERROR" "$LOG_FILE"; then
-    log_print "${YELLOW}Note: Check log file for any warnings or errors${NC}"
-fi
-
-echo "$(date): Update process completed" >> "$LOG_FILE"
+echo "$(date): Update completed" >> "$LOG_FILE"
