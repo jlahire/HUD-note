@@ -145,7 +145,8 @@ This backs up your current installation, copies the new files, and logs everythi
 
 ### Linux notes
 
-- Requires an X11 or Wayland display server (won't work in a headless terminal)
+- Requires an X11 display server (Wayland is not supported — global hotkeys don't work under Wayland)
+- On Ubuntu 22.04+, log out, click the gear icon on the login screen, select "Ubuntu on Xorg", and log back in
 - Transparency and window positioning work on most desktop environments but may vary
 - If hotkeys conflict with your DE, change them in Settings (`Ctrl+Alt+G`)
 

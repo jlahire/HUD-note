@@ -262,7 +262,7 @@ class HUDNotesApp:
         # Stop hotkey manager
         if self.hotkey_manager:
             self.hotkey_manager.shutdown()
-        
+
         # Save configuration
         self.settings.save_config()
         

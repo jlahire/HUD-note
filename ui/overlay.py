@@ -6,6 +6,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox
 from tkinter.scrolledtext import ScrolledText
 import os
+import sys
 from datetime import datetime
 
 from ui.dialogs import TemplateSelectionDialog, SettingsDialog, CodeInputDialog
@@ -51,7 +52,19 @@ class OverlayWindow:
         
         # Configure window
         self.root.attributes('-alpha', 0.85)
-        self.root.overrideredirect(True)
+        if sys.platform.startswith('linux'):
+            # On Linux/X11, overrideredirect(True) prevents the window from
+            # ever receiving keyboard focus. Use 'utility' window type instead
+            # for minimal decorations while keeping WM-managed keyboard focus.
+            self.root.overrideredirect(False)
+            try:
+                self.root.attributes('-type', 'utility')
+            except tk.TclError:
+                pass
+            self._using_overrideredirect = False
+        else:
+            self.root.overrideredirect(True)
+            self._using_overrideredirect = True
         self.root.attributes('-topmost', True)
         self.root.resizable(True, True)
         
@@ -120,6 +133,26 @@ class OverlayWindow:
         # Create tab manager instead of single text area
         self.tab_manager = TabManager(editor_frame, self.app, self.theme_manager)
     
+    def prepare_for_dialog(self):
+        """Temporarily disable overrideredirect so dialogs don't freeze"""
+        if not self._using_overrideredirect:
+            return
+        try:
+            self.root.overrideredirect(False)
+        except Exception:
+            pass
+
+    def restore_after_dialog(self):
+        """Restore overrideredirect after dialog"""
+        if not self._using_overrideredirect:
+            return
+        try:
+            self.root.overrideredirect(True)
+            self.root.attributes('-topmost', True)
+            self.root.focus_force()
+        except Exception:
+            pass
+
     def _bind_events(self):
         """Bind window events"""
         self.root.bind('<Escape>', lambda e: self.hide())
@@ -167,8 +200,8 @@ class OverlayWindow:
                 active_text = self.tab_manager.get_active_text_widget()
                 if active_text:
                     try:
-                        active_text.focus()
-                    except:
+                        active_text.focus_set()
+                    except Exception:
                         pass
 
             self.update_status("HUD Activated")
@@ -221,15 +254,17 @@ class OverlayWindow:
     
     def new_note(self):
         """Create a new note with template selection"""
+        self.prepare_for_dialog()
         # Show template selection dialog with theme support
         dialog = TemplateSelectionDialog(
-            self.root, 
-            self.app.template_manager, 
-            self.app.author_name, 
+            self.root,
+            self.app.template_manager,
+            self.app.author_name,
             self.app.note_title,
             self.theme_manager
         )
         result = dialog.show()
+        self.restore_after_dialog()
         
         # Handle dialog result properly
         if result is None:
@@ -258,11 +293,13 @@ class OverlayWindow:
     
     def open_note(self):
         """Open an existing note in new tab"""
+        self.prepare_for_dialog()
         filename = filedialog.askopenfilename(
             initialdir=self.app.notes_dir,
             title="Open Note",
             filetypes=[("Markdown files", "*.md"), ("Text files", "*.txt"), ("All files", "*.*")]
         )
+        self.restore_after_dialog()
         
         if filename:
             self.tab_manager.open_file_in_new_tab(filename)
@@ -287,12 +324,14 @@ class OverlayWindow:
     
     def save_as_note(self):
         """Save note with new filename"""
+        self.prepare_for_dialog()
         filename = filedialog.asksaveasfilename(
             initialdir=self.app.notes_dir,
             title="Save Note As",
             defaultextension=".md",
             filetypes=[("Markdown files", "*.md"), ("Text files", "*.txt"), ("All files", "*.*")]
         )
+        self.restore_after_dialog()
 
         if filename:
             # Update the active tab's file_path so save_note writes to the new path
@@ -386,13 +425,15 @@ class OverlayWindow:
     
     def open_settings(self):
         """Open settings dialog with theme support"""
+        self.prepare_for_dialog()
         dialog = SettingsDialog(
-            self.root, 
-            self.app.settings, 
+            self.root,
+            self.app.settings,
             self.app.display_manager,
             self.theme_manager
         )
         dialog.show()
+        self.restore_after_dialog()
         
         # Reload theme in case it changed
         self.theme_manager.reload_theme()

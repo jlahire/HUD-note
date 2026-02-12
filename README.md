@@ -115,6 +115,8 @@ HUD-note/
 
 ## Known Issues
 
+- **Wayland not supported** - Global hotkeys require X11. On Ubuntu 22.04+, log out, click the gear icon on the login screen, select "Ubuntu on Xorg", and log back in
+
 - **Preview hotkey** (`Ctrl+Alt+P`) - broken with the tab system, don't use it
 - **Multi-monitor** - display cycling features don't work properly, stick to single monitor
 - **Tab closing** - closing the last tab auto-creates an "Untitled" tab that can act odd

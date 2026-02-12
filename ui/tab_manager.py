@@ -6,6 +6,7 @@ import tkinter as tk
 from tkinter import messagebox
 from tkinter.scrolledtext import ScrolledText
 import os
+import sys
 from typing import Dict, List, Optional
 
 
@@ -127,7 +128,6 @@ class TabManager:
         
         # Bind events
         tab.text_widget.bind('<KeyRelease>', lambda e: self._on_text_change(tab.tab_id))
-        tab.text_widget.bind('<Button-1>', lambda e: self._on_text_change(tab.tab_id))
         
         # Setup shortcuts
         if hasattr(self.app, 'hotkey_manager'):
@@ -224,10 +224,16 @@ class TabManager:
         
         # Check for unsaved changes
         if tab.modified:
+            # Temporarily disable overrideredirect so dialogs don't freeze on Linux
+            overlay = self.app.overlay if hasattr(self.app, 'overlay') else None
+            if overlay:
+                overlay.prepare_for_dialog()
             response = messagebox.askyesnocancel(
                 "Unsaved Changes",
                 f"Save changes to '{tab.title}' before closing?"
             )
+            if overlay:
+                overlay.restore_after_dialog()
             if response is True:  # Yes - save first
                 if not self._save_tab(tab):
                     return  # Save failed, don't close
@@ -241,8 +247,14 @@ class TabManager:
             del self.tab_buttons[tab_id]
         
         if tab.text_widget:
-            tab.text_widget.destroy()
-        
+            # ScrolledText wraps the Text widget inside a container Frame
+            # (text_widget.frame). Destroying only the Text leaves the
+            # container Frame orphaned with a default white background.
+            if hasattr(tab.text_widget, 'frame'):
+                tab.text_widget.frame.destroy()
+            else:
+                tab.text_widget.destroy()
+
         # Remove from tabs dict
         del self.tabs[tab_id]
         
@@ -297,30 +309,39 @@ class TabManager:
     
     def _save_tab(self, tab: Tab) -> bool:
         """Save tab content"""
+        overlay = self.app.overlay if hasattr(self.app, 'overlay') else None
         if not tab.file_path:
             # Need to choose file path
             from tkinter import filedialog
+            if overlay:
+                overlay.prepare_for_dialog()
             filename = filedialog.asksaveasfilename(
                 initialdir=self.app.notes_dir,
                 title="Save Note As",
                 defaultextension=".md",
                 filetypes=[("Markdown files", "*.md"), ("Text files", "*.txt"), ("All files", "*.*")]
             )
+            if overlay:
+                overlay.restore_after_dialog()
             if not filename:
                 return False
             tab.file_path = filename
             tab.title = os.path.basename(filename)
-        
+
         # Save content
         try:
             with open(tab.file_path, 'w', encoding='utf-8') as f:
                 f.write(tab.content)
-            
+
             tab.set_modified(False)
             self._update_tab_title(tab.tab_id)
             return True
         except Exception as e:
+            if overlay:
+                overlay.prepare_for_dialog()
             messagebox.showerror("Error", f"Could not save file: {e}")
+            if overlay:
+                overlay.restore_after_dialog()
             return False
     
     def save_active_tab(self) -> bool:
@@ -343,7 +364,12 @@ class TabManager:
             self.create_new_tab(title=title, content=content, file_path=file_path)
             
         except Exception as e:
+            overlay = self.app.overlay if hasattr(self.app, 'overlay') else None
+            if overlay:
+                overlay.prepare_for_dialog()
             messagebox.showerror("Error", f"Could not open file: {e}")
+            if overlay:
+                overlay.restore_after_dialog()
     
     def update_font_size(self, font_size: int):
         """Update font size for all tabs"""
@@ -382,6 +408,9 @@ class TabManager:
         """Clean up resources"""
         for tab in self.tabs.values():
             if tab.text_widget:
-                tab.text_widget.destroy()
+                if hasattr(tab.text_widget, 'frame'):
+                    tab.text_widget.frame.destroy()
+                else:
+                    tab.text_widget.destroy()
         self.tabs.clear()
         self.tab_buttons.clear()

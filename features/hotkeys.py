@@ -20,27 +20,28 @@ class HotkeyManager:
         # Thread-safe communication queue
         self.command_queue = queue.Queue()
 
-        # Only one hotkey - toggle overlay
+        # Global hotkeys
         self.toggle_hotkey = self.app.settings.get('hotkeys', {}).get('toggle_overlay', 'Ctrl+Alt+H')
+        self.quit_hotkey = 'Ctrl+Alt+Q'
 
-        self._setup_toggle_hotkey()
+        self._setup_global_hotkeys()
         self._start_queue_processor()
 
-    def _setup_toggle_hotkey(self):
-        """Setup only the toggle hotkey with thread-safe queue communication"""
+    def _setup_global_hotkeys(self):
+        """Setup global hotkeys with thread-safe queue communication"""
         def hotkey_listener():
             try:
-                pynput_hotkey = self._convert_hotkey_string(self.toggle_hotkey)
+                hotkey_map = {}
 
-                if pynput_hotkey:
-                    def toggle_action():
-                        try:
-                            self.command_queue.put(('toggle_overlay',))
-                        except Exception:
-                            pass
+                pynput_toggle = self._convert_hotkey_string(self.toggle_hotkey)
+                if pynput_toggle:
+                    hotkey_map[pynput_toggle] = lambda: self.command_queue.put(('toggle_overlay',))
 
-                    hotkey_map = {pynput_hotkey: toggle_action}
+                pynput_quit = self._convert_hotkey_string(self.quit_hotkey)
+                if pynput_quit:
+                    hotkey_map[pynput_quit] = lambda: self.command_queue.put(('quit',))
 
+                if hotkey_map:
                     with keyboard.GlobalHotKeys(hotkey_map):
                         self.running = True
                         while self.running:
@@ -48,7 +49,7 @@ class HotkeyManager:
                             time.sleep(0.1)
 
             except Exception as e:
-                print(f"Toggle hotkey listener error: {e}")
+                print(f"Global hotkey listener error: {e}")
                 self.running = False
 
         self.hotkey_thread = threading.Thread(target=hotkey_listener, daemon=True)
@@ -67,6 +68,9 @@ class HotkeyManager:
                                 self.app.hide_overlay()
                             else:
                                 self.app.show_overlay()
+                        elif command[0] == 'quit':
+                            self.app.shutdown()
+                            return
                     except queue.Empty:
                         break
             except Exception:
@@ -174,11 +178,11 @@ class HotkeyManager:
                 print(f"Error binding text area shortcut {shortcut}: {e}")
 
     def update_hotkeys(self, new_hotkeys: Dict[str, str]):
-        """Update hotkey configuration - only toggle supported"""
+        """Update hotkey configuration"""
         if 'toggle_overlay' in new_hotkeys:
             self.toggle_hotkey = new_hotkeys['toggle_overlay']
             self.shutdown()
-            self._setup_toggle_hotkey()
+            self._setup_global_hotkeys()
 
     def shutdown(self):
         """Shutdown hotkey manager"""
