@@ -155,10 +155,29 @@ class OverlayWindow:
 
     def _bind_events(self):
         """Bind window events"""
+        # Clear any leftover bindings from the startup dialog (the root is
+        # reused, so old <Return>/<Escape> handlers may still be attached).
+        for seq in ('<Return>', '<Escape>'):
+            try:
+                self.root.unbind(seq)
+            except Exception:
+                pass
+
         self.root.bind('<Escape>', lambda e: self.hide())
         self.root.bind('<FocusOut>', self._on_focus_out)
         self.root.bind('<FocusIn>', self._on_focus_in)
         self.root.protocol("WM_DELETE_WINDOW", self.app.shutdown)
+
+        # On Windows, overrideredirect windows lose focus/z-order when clicked.
+        # Re-assert topmost and grab focus on any mouse press.
+        if self._using_overrideredirect:
+            self.root.bind('<Button-1>', self._on_window_click, add='+')
+
+    def _on_window_click(self, event):
+        """Re-assert topmost and focus on click (Windows overrideredirect fix)"""
+        self.root.attributes('-topmost', True)
+        self.root.lift()
+        self.root.after(10, lambda: self.root.focus_force())
     
     def _load_startup_content(self):
         """Load startup content into first tab"""
@@ -184,6 +203,7 @@ class OverlayWindow:
             if self.root:
                 try:
                     self.root.deiconify()
+                    self.root.attributes('-topmost', True)
                     self.root.lift()
                     self.root.focus_force()
                 except RuntimeError as e:
@@ -204,7 +224,21 @@ class OverlayWindow:
                     except Exception:
                         pass
 
+            # On Windows, re-assert topmost after a short delay to survive
+            # the WM activation dance that overrideredirect windows undergo.
+            if self._using_overrideredirect and self.root:
+                self.root.after(50, self._reassert_topmost)
+
             self.update_status("HUD Activated")
+        except Exception:
+            pass
+
+    def _reassert_topmost(self):
+        """Re-assert topmost after show (Windows overrideredirect fix)"""
+        try:
+            if self.root:
+                self.root.attributes('-topmost', True)
+                self.root.lift()
         except Exception:
             pass
 
@@ -559,9 +593,25 @@ class OverlayWindow:
         """Handle focus in"""
         transparency = self.app.settings.get('hud_transparency', 0.85)
         self.root.attributes('-alpha', min(1.0, transparency + 0.1))
-    
+        # On Windows, re-assert topmost to prevent z-order loss with
+        # overrideredirect windows
+        if self._using_overrideredirect:
+            self.root.attributes('-topmost', True)
+            self.root.lift()
+
     def _on_focus_out(self, event):
         """Handle focus out"""
+        # On Windows with overrideredirect, clicking a child widget (e.g. the
+        # text area) triggers FocusOut on the root even though focus is still
+        # inside our window.  Only dim the window when focus truly leaves.
+        try:
+            focus_widget = self.root.focus_get()
+            if focus_widget is not None:
+                # Focus is still somewhere inside our window tree
+                return
+        except KeyError:
+            # focus_get() can raise KeyError for destroyed widgets
+            pass
         transparency = self.app.settings.get('hud_transparency', 0.85)
         self.root.attributes('-alpha', transparency)
     
