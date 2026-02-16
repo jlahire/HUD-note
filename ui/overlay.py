@@ -183,7 +183,6 @@ class OverlayWindow:
         if self._using_overrideredirect:
             self.root.attributes('-topmost', True)
             self.root.lift()
-            self.root.after(10, lambda: self.root.focus_force())
     
     def _load_startup_content(self):
         """Load startup content into first tab"""
