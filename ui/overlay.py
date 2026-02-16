@@ -260,6 +260,12 @@ class OverlayWindow:
 
     def hide(self):
         """Hide the overlay - THREAD SAFE VERSION"""
+        # DEBUG: Print the call stack so we can identify what triggers hide
+        import traceback
+        print("=== HIDE CALLED ===")
+        traceback.print_stack()
+        print("===================")
+
         try:
             if hasattr(self.app, 'window_manager') and self.app.window_manager:
                 self.app.window_manager._save_window_geometry()
