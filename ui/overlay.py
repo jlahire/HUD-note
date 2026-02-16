@@ -168,16 +168,22 @@ class OverlayWindow:
         self.root.bind('<FocusIn>', self._on_focus_in)
         self.root.protocol("WM_DELETE_WINDOW", self.app.shutdown)
 
-        # On Windows, overrideredirect windows lose focus/z-order when clicked.
-        # Re-assert topmost and grab focus on any mouse press.
-        if self._using_overrideredirect:
-            self.root.bind('<Button-1>', self._on_window_click, add='+')
+        # Mark clicks as "inside" so the click-outside-hide feature
+        # (pynput-based) knows not to hide the window.  This avoids
+        # coordinate comparison which breaks with DPI scaling on Windows.
+        self.root.bind('<Button-1>', self._on_window_click, add='+')
 
     def _on_window_click(self, event):
-        """Re-assert topmost and focus on click (Windows overrideredirect fix)"""
-        self.root.attributes('-topmost', True)
-        self.root.lift()
-        self.root.after(10, lambda: self.root.focus_force())
+        """Handle clicks inside the overlay window"""
+        # Tell auto_features this click was inside our window
+        if hasattr(self.app, 'auto_features') and self.app.auto_features:
+            self.app.auto_features.mark_click_inside(event)
+
+        # On Windows, re-assert topmost for overrideredirect windows
+        if self._using_overrideredirect:
+            self.root.attributes('-topmost', True)
+            self.root.lift()
+            self.root.after(10, lambda: self.root.focus_force())
     
     def _load_startup_content(self):
         """Load startup content into first tab"""

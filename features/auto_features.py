@@ -2,7 +2,6 @@
 Auto show/hide features for HUD Notes - THREAD SAFE VERSION
 """
 
-import sys
 import threading
 import time
 from pynput import mouse
@@ -26,37 +25,14 @@ class AutoFeatureManager:
         # Click outside monitoring
         self.click_listener = None
 
-        # DPI scale factor: pynput uses physical pixels, Tkinter may use
-        # logical pixels on Windows.  Detect once and cache.
-        self._dpi_scale = self._detect_dpi_scale()
+        # Track whether a click landed inside the overlay window.
+        # Set to True by a Tkinter <Button-1> binding on the overlay root,
+        # checked by the pynput click handler to avoid coordinate comparison
+        # (which breaks on Windows with DPI scaling).
+        self._click_was_inside = False
 
         self._setup_features()
         self._start_queue_processor()
-
-    def _detect_dpi_scale(self) -> float:
-        """Detect DPI scale factor for coordinate conversion.
-
-        On Windows, pynput reports physical screen coordinates while Tkinter
-        may report logical (DPI-scaled) coordinates depending on the process
-        DPI awareness setting.  We compute the ratio so we can convert between
-        the two coordinate spaces.
-        """
-        if sys.platform != 'win32':
-            return 1.0
-        try:
-            import ctypes
-            # Try to make the process per-monitor DPI aware (no-op if already set)
-            try:
-                ctypes.windll.shcore.SetProcessDpiAwareness(2)
-            except Exception:
-                pass
-            # Get the DPI for the primary monitor (default 96 = 100%)
-            hdc = ctypes.windll.user32.GetDC(0)
-            dpi = ctypes.windll.gdi32.GetDeviceCaps(hdc, 88)  # LOGPIXELSX
-            ctypes.windll.user32.ReleaseDC(0, hdc)
-            return dpi / 96.0
-        except Exception:
-            return 1.0
 
     def _setup_features(self):
         """Setup auto features based on settings"""
@@ -82,11 +58,12 @@ class AutoFeatureManager:
                                 self.app.hide_overlay()
                         elif command[0] == 'check_click_outside':
                             if self.app.overlay_visible and self.app.overlay and self.app.overlay.root:
-                                click_x, click_y = command[1], command[2]
-                                try:
-                                    self._handle_click_outside(click_x, click_y)
-                                except Exception:
-                                    pass
+                                # If Tkinter received a <Button-1> on our
+                                # window, the click was inside — skip hide.
+                                if self._click_was_inside:
+                                    self._click_was_inside = False
+                                else:
+                                    self.app.hide_overlay()
                     except queue.Empty:
                         break
             except Exception:
@@ -103,33 +80,10 @@ class AutoFeatureManager:
         if hasattr(self.app, 'overlay') and self.app.overlay and self.app.overlay.root:
             self.app.overlay.root.after(200, process_commands)
 
-    def _handle_click_outside(self, click_x, click_y):
-        """Check if click is outside the overlay window and hide if so.
-
-        Accounts for DPI scaling differences between pynput (physical pixels)
-        and Tkinter (possibly logical pixels) on Windows.
-        """
-        root = self.app.overlay.root
-        # Tkinter-reported geometry (may be logical pixels on Windows)
-        win_x = root.winfo_rootx()
-        win_y = root.winfo_rooty()
-        win_w = root.winfo_width()
-        win_h = root.winfo_height()
-
-        # Scale Tkinter coordinates to physical pixels to match pynput
-        scale = self._dpi_scale
-        if scale != 1.0:
-            win_x = int(win_x * scale)
-            win_y = int(win_y * scale)
-            win_w = int(win_w * scale)
-            win_h = int(win_h * scale)
-
-        # Add a margin to avoid false-positive hides from clicks on the
-        # window border or due to rounding from DPI conversion.
-        margin = 10
-        if not (win_x - margin <= click_x <= win_x + win_w + margin and
-                win_y - margin <= click_y <= win_y + win_h + margin):
-            self.app.hide_overlay()
+    def mark_click_inside(self, event=None):
+        """Called by Tkinter <Button-1> binding on the overlay root.
+        Tells the pynput handler that this click was inside our window."""
+        self._click_was_inside = True
 
     def setup_mouse_hover_monitor(self):
         """Setup mouse hover monitoring for top-left corner - THREAD SAFE VERSION"""
